@@ -124,6 +124,12 @@ void UrQMD_simpleread(){
 	gStyle->SetHatchesSpacing(2);
 	gStyle->SetHatchesLineWidth(2);
 	
+	TCanvas * canvas = new TCanvas();
+	canvas->Divide(2, 1, 0.01, 0.01);
+	canvas->cd(1);
+	hpt->Draw();
+	canvas->cd(2);
+	hpid->Draw();
 	//---- set color table...
 //  	const Int_t NRGBs = 5;
 //  	      Int_t NCont = NE;
