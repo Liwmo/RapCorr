@@ -35,14 +35,13 @@ int PLOT_ON	= 1;
 #include "TApplication.h"
 using namespace std;
 
-float 	etaCorrelations();
+float etaCorrelations();
 double * getXValsForLogAxis(int, float, float);
-float	GetC2Baseline(TH1D*);
-float	GetC3Baseline(TH1D*);
-
-#if !defined(ARRAY_SIZE)
-    #define ARRAY_SIZE(x) (sizeof((x)) / sizeof((x)[0]))
-#endif
+void resetHistograms(TH1**, int);
+void setupOutputFilePaths(TString&, TString&, TString&, TString&);
+void setStyle();
+float getC2Baseline(TH1D*);
+float getC3Baseline(TH1D*);
 
 int main(int argc, char **argv) {
 	gRandom->SetSeed(123456);
@@ -56,7 +55,6 @@ float etaCorrelations() {
 	char buf[200];
 	int iCanvas = -1;
 	TCanvas *canvases[100];
-	TString plotFileBase, rootOutFile;
 	TString plotFile0, plotFile, plotFileC, plotFilePDF;
 
 	const int numBins = 200;
@@ -65,16 +63,7 @@ float etaCorrelations() {
 	double * binXVals = new double[numBins + 1];
 	binXVals = getXValsForLogAxis(numBins, axis1, axis2);
 
-	if(PLOT_ON) {
-		rootOutFile	= TString(Form("./root/etacorr.root"));
-		plotFileBase = TString(Form("./ps/etacorr"));
-		cout << "root file = " << rootOutFile.Data() << endl;
-		cout << "plot file = " << plotFileBase.Data() << endl;
-		plotFile0 = plotFileBase + TString(".ps(");
-		plotFile = plotFileBase + TString(".ps");
-		plotFileC = plotFileBase + TString(".ps]");
-		plotFilePDF	= plotFileBase + TString(".pdf");
-	}
+	setupOutputFilePaths(plotFile0, plotFile, plotFileC, plotFilePDF);
 
 	const int NBETA	= 35;
 	const float ETAMAX = 0.7;
@@ -92,19 +81,9 @@ float etaCorrelations() {
 	TH1D *hR2dEta_N = new TH1D("hR2dEta_N", "NBINS vs #eta_{1}-#eta_{2}", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
 	TH1D *hR2dEtaBase = new TH1D("hR2dEtaBase", "#LTR_{2}#GT-Baseline vs #eta_{1}-#eta_{2}", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
 
-	hMultGen->Reset();	
-	hEtaGen->Reset();
-	hdEta->Reset();	
-	hEta1D->Reset();
-	hEta2D->Reset();
-	hEtaT2D->Reset();	
-	hR2->Reset();
-	hC2->Reset();
-	hCorr1D->Reset();
-	hm2D->Reset();
-	hR2dEta->Reset();
-	hR2dEta_N->Reset();
-	hR2dEtaBase->Reset();
+	TH1 * histograms[13] = {hMultGen, hEtaGen, hdEta, hEta1D, hEta2D, hEtaT2D, 
+		hR2, hC2, hCorr1D, hm2D, hR2dEta, hR2dEta_N, hR2dEtaBase};
+	resetHistograms(histograms, 13);
 
 	TH3D *hEta3D = new TH3D("hEta3D", "hEta3D", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
 	TH3D *hR3 = new TH3D("hR3", "hR3", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
@@ -117,7 +96,7 @@ float etaCorrelations() {
 	int freqNumBins	= 500;
 	float freqBinWidth = 0.0001; 
 	TH1D *hR2dEtaBaseValDist = new TH1D("hR2dEtaBaseValDist", "Frequency #LTR_{2}#GT-Baseline",
-			freqNumBins, -freqNumBins * freqBinWidth / 2., freqNumBins * freqBinWidth / 2.);	// bw=0.0002
+			freqNumBins, -freqNumBins * freqBinWidth / 2., freqNumBins * freqBinWidth / 2.);
 
 	const int N_EVENTS = 10000000;
 	      int N_TRACK = 4;
@@ -131,7 +110,7 @@ float etaCorrelations() {
 		}
 		hMultGen->Fill(N_TRACK);
 		
-		for(int iTrack = 0; iTrack < N_TRACK - 2 * N_TRACK_PAIRS; iTrack++) {		// random sampled...
+		for(int iTrack = 0; iTrack < N_TRACK - 2 * N_TRACK_PAIRS; iTrack++) {
 			float eta = -1.0 + 2.0 * gRandom->Rndm();			
 			hEtaGen->Fill(eta);
 			etaArr[iTrack] = eta;
@@ -215,8 +194,8 @@ float etaCorrelations() {
 	hR3->Add(hm3D);
 		
 	cout<<"Calculating Baselines..."<<endl;
-	float baseC2 = GetC2Baseline(hMultGen);
-	float baseC3 = GetC3Baseline(hMultGen);
+	float baseC2 = getC2Baseline(hMultGen);
+	float baseC3 = getC3Baseline(hMultGen);
 	for(int ibx = 1; ibx <= NBETA; ibx++) {
 		for (int iby = 1; iby <= NBETA; iby++) {
 			float oval2	= hR2->GetBinContent(ibx, iby);
@@ -285,43 +264,12 @@ float etaCorrelations() {
 		 << hR2dEtaBaseValDist->GetBinContent(hR2dEtaBaseValDist->GetNbinsX() + 1)
 		 << endl;
 
-	gStyle->SetPaperSize(TStyle::kUSLetter);
-	gStyle->SetLabelSize(0.05,"X");
-	gStyle->SetLabelSize(0.05,"Y");
-	gStyle->SetTitleXSize(0.055);
-	gStyle->SetTitleYSize(0.055);
-	gStyle->SetTitleOffset(0.85,"X");
-	gStyle->SetTitleOffset(1.2,"Y");
-	gStyle->SetOptStat(111110);
-	gStyle->SetStatStyle(0); 
-	gStyle->SetTitleStyle(0); 
-	gStyle->SetStatX(0.94);
-	gStyle->SetStatY(0.92);
-	gStyle->SetStatH(0.26);
-	gStyle->SetStatW(0.4);
-	gStyle->SetErrorX(0.0001);
-	gStyle->SetPadRightMargin(0.06);
-	gStyle->SetPadTopMargin(0.08);
-	gStyle->SetPadBottomMargin(0.05);
-	gStyle->SetPadLeftMargin(0.08);
-	gStyle->SetTitleX(0.5);
-	gStyle->SetTitleY(1.0);
-	gStyle->SetTitleW(0.75);
-	gStyle->SetTitleH(0.075);
-	gStyle->SetTitleTextColor(1);
-	gStyle->SetTitleSize(0.1,"T");
-	gStyle->SetPalette(1);
-	gStyle->SetHistMinimumZero(kFALSE);
-	
-	gStyle->SetHatchesSpacing(2);
-	gStyle->SetHatchesLineWidth(2);
-
-	double ylimits[2]	= {0};
+	setStyle();
 
 	if(PLOT_ON) {
 
 		//---- R2
-		++iCanvas;
+		iCanvas++;
 		sprintf(buf, "canvases%d", iCanvas);
 		canvases[iCanvas] = new TCanvas(buf, buf, 30 * iCanvas, 30 * iCanvas, 800, (8.5 / 11.) * 800);
 		canvases[iCanvas]->cd(); canvases[iCanvas]->Divide(3,2,0.0001,0.0001);
@@ -401,8 +349,62 @@ double * getXValsForLogAxis(int numBins, float axis1, float axis2) {
 	return binXVals;
 }
 
+void resetHistograms(TH1 ** histograms, int size) {
+	for(int i = 0; i < size; i++) {
+		histograms[i]->Reset();
+	}
+}
 
-float GetC2Baseline(TH1D *hmult){
+void setupOutputFilePaths(TString &plotFile0, TString &plotFile, 
+	TString &plotFileC, TString &plotFilePDF) {
+
+	TString plotFileBase, rootOutFile;
+
+	if(PLOT_ON) {
+		rootOutFile	= TString(Form("./root/etacorr.root"));
+		plotFileBase = TString(Form("./ps/etacorr"));
+		cout << "root file = " << rootOutFile.Data() << endl;
+		cout << "plot file = " << plotFileBase.Data() << endl;
+		plotFile0 = plotFileBase + TString(".ps(");
+		plotFile = plotFileBase + TString(".ps");
+		plotFileC = plotFileBase + TString(".ps]");
+		plotFilePDF	= plotFileBase + TString(".pdf");
+	}
+}
+
+void setStyle() {
+	gStyle->SetPaperSize(TStyle::kUSLetter);
+	gStyle->SetLabelSize(0.05,"X");
+	gStyle->SetLabelSize(0.05,"Y");
+	gStyle->SetTitleXSize(0.055);
+	gStyle->SetTitleYSize(0.055);
+	gStyle->SetTitleOffset(0.85,"X");
+	gStyle->SetTitleOffset(1.2,"Y");
+	gStyle->SetOptStat(111110);
+	gStyle->SetStatStyle(0); 
+	gStyle->SetTitleStyle(0); 
+	gStyle->SetStatX(0.94);
+	gStyle->SetStatY(0.92);
+	gStyle->SetStatH(0.26);
+	gStyle->SetStatW(0.4);
+	gStyle->SetErrorX(0.0001);
+	gStyle->SetPadRightMargin(0.06);
+	gStyle->SetPadTopMargin(0.08);
+	gStyle->SetPadBottomMargin(0.05);
+	gStyle->SetPadLeftMargin(0.08);
+	gStyle->SetTitleX(0.5);
+	gStyle->SetTitleY(1.0);
+	gStyle->SetTitleW(0.75);
+	gStyle->SetTitleH(0.075);
+	gStyle->SetTitleTextColor(1);
+	gStyle->SetTitleSize(0.1,"T");
+	gStyle->SetPalette(1);
+	gStyle->SetHistMinimumZero(kFALSE);
+	gStyle->SetHatchesSpacing(2);
+	gStyle->SetHatchesLineWidth(2);
+}
+
+float getC2Baseline(TH1D *hmult){
 	if(!hmult) { 
 		exit(0); 
 	}
@@ -429,7 +431,7 @@ float GetC2Baseline(TH1D *hmult){
 	return result;
 }
 
-float GetC3Baseline(TH1D *hmult){
+float getC3Baseline(TH1D *hmult){
 	if(!hmult) { 
 		exit(0); 
 	}
