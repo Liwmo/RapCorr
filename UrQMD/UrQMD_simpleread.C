@@ -90,8 +90,6 @@ void UrQMD_simpleread(){
 	}
 	cout << "finished..." << endl;
 
-
-	//---- plotting setup
 	gStyle->SetPaperSize(TStyle::kUSLetter);
 	gStyle->SetLabelSize(0.05, "X");
 	gStyle->SetLabelSize(0.05, "Y");
@@ -106,7 +104,6 @@ void UrQMD_simpleread(){
 	gStyle->SetStatY(0.92);
 	gStyle->SetStatH(0.26);
 	gStyle->SetStatW(0.4);
-	//gStyle->SetTitleSize(0.6);
 	gStyle->SetErrorX(0.0001);
 	gStyle->SetPadRightMargin(0.06);
 	gStyle->SetPadTopMargin(0.08);
@@ -130,17 +127,6 @@ void UrQMD_simpleread(){
 	hpt->Draw();
 	canvas->cd(2);
 	hpid->Draw();
-	//---- set color table...
-//  	const Int_t NRGBs = 5;
-//  	      Int_t NCont = NE;
-// 	//Double_t stops[NRGBs]	= { 0.00, 0.34, 0.61, 0.84, 1.00 };
-//  	Double_t stops[NRGBs]	= { 0.00, 0.10, 0.61, 0.99, 1.00 };
-//  	Double_t red[NRGBs]		= { 0.00, 0.00, 0.87, 1.00, 0.51 };
-//  	Double_t green[NRGBs]	= { 0.00, 0.81, 1.00, 0.20, 0.00 };
-//  	Double_t blue[NRGBs]	= { 0.51, 1.00, 0.12, 0.00, 0.00 };
-//  	icolstart_energy	= TColor::CreateGradientColorTable(NRGBs, stops, red, green, blue, NE);
-//  	icolstart_sets 		= TColor::CreateGradientColorTable(NRGBs, stops, red, green, blue, NSET/2);
-}
 
 void GetInfo(int geid, float px, float py, float pz, 
         TString &name, float &amass, float &achg, float &alife,
@@ -148,7 +134,6 @@ void GetInfo(int geid, float px, float py, float pz,
         float &aptot, float &apt, float &abn) {
 
         amass = achg = alife = -9; 
-        // GEANT ID            PARTICLE                            MASS          CHARGE        LIFETIME       BARYON #?
         if(geid == 1)      {name=TString("GAMMA");         amass = .0000E+00; achg =  0.; alife = .10000E+16; abn =  0;}
         else if(geid == 2) {name=TString("POSITRON");      amass = .5110E-03; achg =  1.; alife = .10000E+16; abn =  0;}
         else if(geid == 3) {name=TString("ELECTRON");      amass = .5110E-03; achg = -1.; alife = .10000E+16; abn =  0;}
