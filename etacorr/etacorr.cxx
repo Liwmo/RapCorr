@@ -35,7 +35,7 @@ const int PLOT_ON = 1;
 #include "TApplication.h"
 using namespace std;
 
-float etaCorrelations();
+void etaCorrelations();
 double * getXValsForLogAxis(int, float, float);
 void resetHistograms(TH1**, int);
 void setupOutputFilePaths(TString&, TString&, TString&, TString&);
@@ -51,21 +51,29 @@ void fillConstant3DHistogram(TH3D*, float, TH1D*);
 void fillC2rho1Histogram(TH3D*, TH2D*, TH1D*);
 void calculateR2Histogram(TH2D*, TH2D*, TH2D*);
 void calculateR3Histogram(TH3D*, TH3D*, TH3D*, TH3D*);
-void applyC2BaselineAdjustment(TH2D*, float, int);
-void applyC3BaselineAdjustment(TH3D*, float, int);
-void setStyle();
 float getC2Baseline(TH1D*);
 float getC3Baseline(TH1D*);
+void applyC2BaselineAdjustment(TH2D*, float, int);
+void applyC3BaselineAdjustment(TH3D*, float, int);
+void fillR2dEtaHistogram(TH1D*, TH1D*, TH2D*, int);
+void fillR3dEtaHistogram(TH2D*, TH2D*, TH3D*, int);
+void fillR2EtaBaseHistogram(TH1D*, TH1D*);
+void fillR2EtaBaseValDistHistogram(TH1D*, TH1D*);
+void setStyle();
+void drawR2HistogramsToFile(TCanvas**, int&, TString, TH1D*, TH2D*, TH1D*, TH1D*, TH2D*, TH1D*);
+void drawR3HistogramsToFile(TCanvas**, int&, TString, TH1D*, TH2D*, TH2D*);
+void executeFilePlots(TCanvas**, int, TString, TString, TString);
+
+
 
 int main(int argc, char **argv) {
 	gRandom->SetSeed(123456);
-	float rms = etaCorrelations();
+	etaCorrelations();
 	return 0;
 }
 
-float etaCorrelations() {
+void etaCorrelations() {
 	TH1::AddDirectory(kFALSE);
-	char buf[200];
 	int iCanvas = -1;
 	TCanvas *canvases[100];
 	TString plotFile0, plotFile, plotFileC, plotFilePDF;
@@ -150,131 +158,26 @@ float etaCorrelations() {
 	applyC3BaselineAdjustment(hR3, baseC3, NBETA);
 
 	cout<<"Averaging in dEta slices..."<<endl;
-	for(int ibx = 1; ibx <= NBETA; ibx++) {								// x-bin
-		for(int iby = 1; iby <= NBETA; iby++) {							// y-bin
-			float dEtaXY, dEtaXZ;									
-			
-			dEtaXY = hR2->GetXaxis()->GetBinCenter(ibx) 		
-			       - hR2->GetYaxis()->GetBinCenter(iby);
-			hR2dEta->Fill(dEtaXY,hR2->GetBinContent(ibx, iby));
-			hR2dEta_N->Fill(dEtaXY, 1.0);
-			
-			for(int ibz = 1; ibz <= NBETA; ibz++) {					// z-bin
-				dEtaXY	= hR3->GetXaxis()->GetBinCenter(ibx) 		//
-			            - hR3->GetYaxis()->GetBinCenter(iby);		// this is the dy for this xy diagonal
-				dEtaXZ	= hR3->GetXaxis()->GetBinCenter(ibx) 		//
-			        	- hR3->GetZaxis()->GetBinCenter(ibz);		// this is the dy for this xz diagonal
-			    hR3dEta->Fill(dEtaXY, dEtaXZ, hR3->GetBinContent(ibx, iby, ibz));
-			    hR3dEta_N->Fill(dEtaXY, dEtaXZ, 1.0);
-			}
-		}	
-	}
+	fillR2dEtaHistogram(hR2dEta, hR2dEta_N, hR2, NBETA);
+	fillR3dEtaHistogram(hR3dEta, hR3dEta_N, hR3, NBETA);
 	hR2dEta->Divide(hR2dEta_N);
 	hR3dEta->Divide(hR3dEta_N);
 	
-	int nbinx = hEta2D->GetNbinsX();
-	int nbiny = hEta2D->GetNbinsY();
-	for(int ibin = 1; ibin <= nbinx; ibin++) {
-		for(int jbin = 1; jbin <= nbiny; jbin++) {
-			float val = hC2->GetBinContent(ibin, jbin);
-			hCorr1D->Fill(val);			
-		}
-	}	
-	
-	float integralC2 = 0.0;
-	for(int ibin = 1; ibin <= hR2dEta->GetNbinsX(); ibin++) {
-		float dEta	 = hR2dEta->GetBinCenter(ibin);
-		float val	 = hR2dEta->GetBinContent(ibin);
-		float valErr = hR2dEta->GetBinError(ibin);		// INCORRECT ERRORS VALS
-		float bWidth = hR2dEta->GetBinWidth(ibin);
-		hR2dEtaBase->SetBinContent(ibin, val);			// straight copy now...
-		hR2dEtaBase->SetBinError(ibin, valErr);			// INCORRECT ERRORS VALS.
-		if(dEta >= 0.0) {
-			hR2dEtaBaseValDist->Fill(val);
-		}
-		integralC2	+= val * bWidth;
-	}
-	
-	float rms = 1000. * hR2dEtaBaseValDist->GetRMS();
-	
-	cout << "C2 Baseline = " << baseC2
-		 << "\t <R2>-baseline Integral = " << integralC2
-		 << "\t 1000. * RMS = " << rms
-		 << "\t OVER/UNDER = "
-		 << hR2dEtaBaseValDist->GetBinContent(0) << " "
-		 << hR2dEtaBaseValDist->GetBinContent(hR2dEtaBaseValDist->GetNbinsX() + 1)
-		 << endl;
+	fillR2EtaBaseHistogram(hR2dEtaBase, hR2dEta);
+	fillR2EtaBaseValDistHistogram(hR2dEtaBaseValDist, hR2dEta);
 
+	cout << "Preparing files..." << endl;
 	setStyle();
+	drawR2HistogramsToFile(canvases, iCanvas, plotFile0, hEtaGen, hEta2D, hMultGen, 
+		hR2dEtaBaseValDist, hR2, hR2dEtaBase);
+	drawR3HistogramsToFile(canvases, iCanvas, plotFile, hR2dEtaBase, 
+		hR3dEta, hR3dEta_N);
+	executeFilePlots(canvases, iCanvas, plotFileC, plotFile, plotFilePDF);
 
-	if(PLOT_ON) {
-
-		//---- R2
-		iCanvas++;
-		sprintf(buf, "canvases%d", iCanvas);
-		canvases[iCanvas] = new TCanvas(buf, buf, 30 * iCanvas, 30 * iCanvas, 800, (8.5 / 11.) * 800);
-		canvases[iCanvas]->cd(); canvases[iCanvas]->Divide(3,2,0.0001,0.0001);
-			canvases[iCanvas]->cd(1);
-				hEtaGen->SetMinimum(0.5);
-				hEtaGen->SetStats(0);
-				hEtaGen->Draw();
-			canvases[iCanvas]->cd(2);
-				hEta2D->SetStats(0);
-				hEta2D->Draw("colz");
-			canvases[iCanvas]->cd(3);
-				hMultGen->Draw();
-			canvases[iCanvas]->cd(4);
-				hR2dEtaBaseValDist->Draw();
-			canvases[iCanvas]->cd(5);
-				hR2->SetStats(0);
-				hR2->Draw("colz");
-			canvases[iCanvas]->cd(6);
-				hR2dEtaBase->SetStats(0);
-				hR2dEtaBase->SetMinimum(-0.005);
-				hR2dEtaBase->SetMaximum( 0.005);
-				hR2dEtaBase->SetMarkerStyle(20);
-				hR2dEtaBase->SetMarkerSize(1);
-				hR2dEtaBase->SetMarkerColor(4);
-				hR2dEtaBase->SetLineColor(4);
-				hR2dEtaBase->Draw("hist");
-		canvases[iCanvas]->cd(); 
-		canvases[iCanvas]->Update();
-		canvases[iCanvas]->Print(plotFile0.Data());
-		
-		//---- R3
-		gStyle->SetOptStat(0);
-		gStyle->SetPadRightMargin(0.15);
-		++iCanvas;
-		sprintf(buf,"canvases%d",iCanvas);
-		canvases[iCanvas] = new TCanvas(buf,buf,30*iCanvas,30*iCanvas,800,(8.5/11.)*800);
-		canvases[iCanvas]->cd(); canvases[iCanvas]->Divide(3,2,0.0001,0.0001);
-			canvases[iCanvas]->cd(1);
-				hR2dEtaBase->Draw("HIST");
-			canvases[iCanvas]->cd(2);
-				hR3dEta->Draw("COLZ1");
-			canvases[iCanvas]->cd(3);
-				hR3dEta_N->Draw("COLZ1");
-			canvases[iCanvas]->cd(4);
-			canvases[iCanvas]->cd(5);
-			canvases[iCanvas]->cd(6);
-		canvases[iCanvas]->cd(); 
-		canvases[iCanvas]->Update();
-		canvases[iCanvas]->Print(plotFile.Data());
-		gStyle->SetPadRightMargin(0.06);
-	}	
-	
-	if (PLOT_ON){
-	 	cout << " You plotted " << iCanvas + 1 << " canvases......." << endl;
-	 	canvases[iCanvas]->Print(plotFileC.Data());
-	 	sprintf(buf, "/usr/bin/pstopdf %s -o %s", plotFile.Data(), plotFilePDF.Data());
-	 	cout << " " << buf << endl;
-	 	gSystem->Exec(buf);
-	}
+	if(PLOT_ON) {cout << "You plotted " << iCanvas << " canvases..." << endl;}
 	
 	delete[] binXVals;
-	delete[] etaArr;
-	return rms;
-	
+	delete[] etaArr;	
 }
 
 double * getXValsForLogAxis(int numBins, float axis1, float axis2) {
@@ -313,6 +216,8 @@ void setupOutputFilePaths(TString &plotFile0, TString &plotFile,
 		plotFilePDF	= plotFileBase + TString(".pdf");
 	}
 }
+
+
 
 float * fillRandomRapidities(TH1D* hEtaGen, int N_TRACKS, int N_TRACK_PAIRS) {
 	float *etaArr = new float[N_TRACKS];
@@ -360,6 +265,8 @@ void fill3DRapidityDist(TH3D *hEta3D, TH3D *hR3, float * etaArr, int N_TRACKS) {
 	}
 }
 
+
+
 void normalizeHistograms(TH1 **histos, int normConst, int size) {
 	for(int i = 0; i < size; i++) {
 		histos[i]->Scale(1. / normConst);
@@ -396,6 +303,7 @@ void fill3DTensorProduct(TH3D *hEtaT3D, TH1D *hEta1D) {
 	}
 }
 
+
 void fillConstant2DHistogram(TH2D *hConst2D, float val, TH1D *hEta1D) {
 	int nbin = hEta1D->GetNbinsX();
 	for(int ibin = 1; ibin <= nbin; ibin++) {
@@ -421,6 +329,8 @@ void fillConstant3DHistogram(TH3D* hConst3D, float val, TH1D *hEta1D) {
 	}
 }
 
+
+
 void fillC2rho1Histogram(TH3D *hC2rho1, TH2D *hEta2D, TH1D *hEta1D) {
 	int nbin = hEta1D->GetNbinsX();
 	float valxi, valxj, valxk, valnij, valnk;
@@ -439,6 +349,8 @@ void fillC2rho1Histogram(TH3D *hC2rho1, TH2D *hEta2D, TH1D *hEta1D) {
 	}
 }
 
+
+
 void calculateR2Histogram(TH2D *hR2, TH2D *hEtaT2D, TH2D *hConst2D) {
 	hR2->Divide(hEtaT2D);
 	hR2->Add(hConst2D);
@@ -451,6 +363,35 @@ void calculateR3Histogram(TH3D *hR3, TH3D *hEtaT3D, TH3D *hC2rho1, TH3D *hConst3
 	hR3->Add(hC2rho1, -1.0);
 	hR3->Add(hConst3D);
 }
+
+void fillR2dEtaHistogram(TH1D *hR2dEta, TH1D *hR2dEta_N, TH2D *hR2, int NBETA) {
+	for(int ibx = 1; ibx <= NBETA; ibx++) {								
+		for(int iby = 1; iby <= NBETA; iby++) {						
+			float dEtaXY;									
+			dEtaXY = hR2->GetXaxis()->GetBinCenter(ibx) 		
+			       - hR2->GetYaxis()->GetBinCenter(iby);
+			hR2dEta->Fill(dEtaXY,hR2->GetBinContent(ibx, iby));
+			hR2dEta_N->Fill(dEtaXY, 1.0);
+		}	
+	}
+}
+
+void fillR3dEtaHistogram(TH2D *hR3dEta, TH2D *hR3dEta_N, TH3D *hR3, int NBETA) {
+	for(int ibx = 1; ibx <= NBETA; ibx++) {						
+		for(int iby = 1; iby <= NBETA; iby++) {						
+			for(int ibz = 1; ibz <= NBETA; ibz++) {					
+				float dEtaXY, dEtaXZ;									
+				dEtaXY	= hR3->GetXaxis()->GetBinCenter(ibx) 		
+			            - hR3->GetYaxis()->GetBinCenter(iby);
+				dEtaXZ	= hR3->GetXaxis()->GetBinCenter(ibx) 		
+			        	- hR3->GetZaxis()->GetBinCenter(ibz);
+			    hR3dEta->Fill(dEtaXY, dEtaXZ, hR3->GetBinContent(ibx, iby, ibz));
+			    hR3dEta_N->Fill(dEtaXY, dEtaXZ, 1.0);
+			}
+		}	
+	}
+}
+
 
 float getC2Baseline(TH1D *hmult){
 	if(!hmult) { exit(0); }
@@ -510,6 +451,7 @@ float getC3Baseline(TH1D *hmult){
 	return result;
 }
 
+
 void applyC2BaselineAdjustment(TH2D *hR2, float baseC2, int NBETA) {
 	for(int ibx = 1; ibx <= NBETA; ibx++) {
 		for (int iby = 1; iby <= NBETA; iby++) {
@@ -518,6 +460,7 @@ void applyC2BaselineAdjustment(TH2D *hR2, float baseC2, int NBETA) {
 		}
 	}
 }
+
 void applyC3BaselineAdjustment(TH3D *hR3, float baseC3, int NBETA) {
 	for(int ibx = 1; ibx <= NBETA; ibx++) {
 		for (int iby = 1; iby <= NBETA; iby++) {
@@ -528,6 +471,28 @@ void applyC3BaselineAdjustment(TH3D *hR3, float baseC3, int NBETA) {
 		}
 	}
 }
+
+
+void fillR2EtaBaseHistogram(TH1D *hR2dEtaBase, TH1D *hR2dEta) { 
+	for(int ibin = 1; ibin <= hR2dEta->GetNbinsX(); ibin++) {
+		float val	 = hR2dEta->GetBinContent(ibin);
+		float valErr = hR2dEta->GetBinError(ibin);		// INCORRECT ERRORS VALS
+		hR2dEtaBase->SetBinContent(ibin, val);			// straight copy now...
+		hR2dEtaBase->SetBinError(ibin, valErr);			// INCORRECT ERRORS VALS.
+	}
+}
+
+void fillR2EtaBaseValDistHistogram(TH1D *hR2dEtaBaseValDist, TH1D *hR2dEta) {
+	for(int ibin = 1; ibin <= hR2dEta->GetNbinsX(); ibin++) {
+		float dEta	 = hR2dEta->GetBinCenter(ibin);
+		float val	 = hR2dEta->GetBinContent(ibin);
+		if(dEta >= 0.0) {
+			hR2dEtaBaseValDist->Fill(val);
+		}
+	}
+}
+
+
 
 void setStyle() {
 	gStyle->SetPaperSize(TStyle::kUSLetter);
@@ -560,3 +525,81 @@ void setStyle() {
 	gStyle->SetHatchesSpacing(2);
 	gStyle->SetHatchesLineWidth(2);
 }
+
+void drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile0, TH1D *hEtaGen, TH2D *hEta2D, 
+	TH1D *hMultGen, TH1D* hR2dEtaBaseValDist, TH2D* hR2, TH1D* hR2dEtaBase) {
+	if(PLOT_ON) {
+		char buf[200];
+		iCanvas++;
+		sprintf(buf, "canvases%d", iCanvas);
+		canvases[iCanvas] = new TCanvas(buf, buf, 30 * iCanvas, 30 * iCanvas, 800, (8.5 / 11.) * 800);
+		canvases[iCanvas]->cd(); 
+		canvases[iCanvas]->Divide(3,2,0.0001,0.0001);
+			canvases[iCanvas]->cd(1);
+				hEtaGen->SetMinimum(0.5);
+				hEtaGen->SetStats(0);
+				hEtaGen->Draw();
+			canvases[iCanvas]->cd(2);
+				hEta2D->SetStats(0);
+				hEta2D->Draw("colz");
+			canvases[iCanvas]->cd(3);
+				hMultGen->Draw();
+			canvases[iCanvas]->cd(4);
+				hR2dEtaBaseValDist->Draw();
+			canvases[iCanvas]->cd(5);
+				hR2->SetStats(0);
+				hR2->Draw("colz");
+			canvases[iCanvas]->cd(6);
+				hR2dEtaBase->SetStats(0);
+				hR2dEtaBase->SetMinimum(-0.005);
+				hR2dEtaBase->SetMaximum( 0.005);
+				hR2dEtaBase->SetMarkerStyle(20);
+				hR2dEtaBase->SetMarkerSize(1);
+				hR2dEtaBase->SetMarkerColor(4);
+				hR2dEtaBase->SetLineColor(4);
+				hR2dEtaBase->Draw("hist");
+		canvases[iCanvas]->cd(); 
+		canvases[iCanvas]->Update();
+		canvases[iCanvas]->Print(plotFile0.Data());
+	}
+}
+
+void drawR3HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile,
+	TH1D *hR2dEtaBase, TH2D *hR3dEta, TH2D *hR3dEta_N) {
+	if(PLOT_ON) {
+		char buf[200];
+		iCanvas++;	
+		gStyle->SetOptStat(0);
+		gStyle->SetPadRightMargin(0.15);
+		iCanvas++;
+		sprintf(buf, "canvases%d", iCanvas);
+		canvases[iCanvas] = new TCanvas(buf, buf, 30 * iCanvas, 30 * iCanvas, 800, (8.5 / 11.) * 800);
+		canvases[iCanvas]->cd(); 
+		canvases[iCanvas]->Divide(3, 2, 0.0001, 0.0001);
+			canvases[iCanvas]->cd(1);
+				hR2dEtaBase->Draw("HIST");
+			canvases[iCanvas]->cd(2);
+				hR3dEta->Draw("COLZ1");
+			canvases[iCanvas]->cd(3);
+				hR3dEta_N->Draw("COLZ1");
+			canvases[iCanvas]->cd(4);
+			canvases[iCanvas]->cd(5);
+			canvases[iCanvas]->cd(6);
+		canvases[iCanvas]->cd(); 
+		canvases[iCanvas]->Update();
+		canvases[iCanvas]->Print(plotFile.Data());
+		gStyle->SetPadRightMargin(0.06);
+	}	
+}
+
+void executeFilePlots(TCanvas **canvases, int iCanvas, TString plotFileC, 
+	TString plotFile, TString plotFilePDF) {
+	if (PLOT_ON){
+		char buf[200];
+	 	canvases[iCanvas]->Print(plotFileC.Data());
+	 	sprintf(buf, "/usr/bin/pstopdf %s -o %s", plotFile.Data(), plotFilePDF.Data());
+	 	cout << " " << buf << endl;
+	 	gSystem->Exec(buf);
+	}
+}
+
