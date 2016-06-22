@@ -1,4 +1,4 @@
-int PLOT_ON	= 1;
+const int PLOT_ON = 1;
 
 #include <string>
 #include "stdio.h"
@@ -39,6 +39,20 @@ float etaCorrelations();
 double * getXValsForLogAxis(int, float, float);
 void resetHistograms(TH1**, int);
 void setupOutputFilePaths(TString&, TString&, TString&, TString&);
+float * fillRandomRapidities(TH1D*, int, int); 
+void fill1DRapidityDist(TH1D*, TH1D*, float*, int);
+void fill2DRapidityDist(TH2D*, TH2D*, float*, int);
+void fill3DRapidityDist(TH3D*, TH3D*, float*, int);
+void normalizeHistograms(TH1**, int, int);
+void fill2DTensorProduct(TH2D*, TH1D*);
+void fill3DTensorProduct(TH3D*, TH1D*);
+void fillConstant2DHistogram(TH2D*, float, TH1D*);
+void fillConstant3DHistogram(TH3D*, float, TH1D*);
+void fillC2rho1Histogram(TH3D*, TH2D*, TH1D*);
+void calculateR2Histogram(TH2D*, TH2D*, TH2D*);
+void calculateR3Histogram(TH3D*, TH3D*, TH3D*, TH3D*);
+void applyC2BaselineAdjustment(TH2D*, float, int);
+void applyC3BaselineAdjustment(TH3D*, float, int);
 void setStyle();
 float getC2Baseline(TH1D*);
 float getC3Baseline(TH1D*);
@@ -50,7 +64,6 @@ int main(int argc, char **argv) {
 }
 
 float etaCorrelations() {
-
 	TH1::AddDirectory(kFALSE);
 	char buf[200];
 	int iCanvas = -1;
@@ -62,7 +75,6 @@ float etaCorrelations() {
 	float axis2 = 1.0;
 	double * binXVals = new double[numBins + 1];
 	binXVals = getXValsForLogAxis(numBins, axis1, axis2);
-
 	setupOutputFilePaths(plotFile0, plotFile, plotFileC, plotFilePDF);
 
 	const int NBETA	= 35;
@@ -76,137 +88,66 @@ float etaCorrelations() {
 	TH2D *hR2 = new TH2D("hR2", "R_{2} vs (#eta_{1},#eta_{2})", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
 	TH2D *hC2 = new TH2D("hC2", "C_{2} vs (#eta_{1},#eta_{2})", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
 	TH1D *hCorr1D = new TH1D("hCorr1D", "hCorr1D", numBins, binXVals);
-	TH2D *hm2D = new TH2D("hm2D", "hm2D", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
+	TH2D *hConst2D = new TH2D("hConst2D", "hConst2D", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
 	TH1D *hR2dEta = new TH1D("hR2dEta", "#LTR_{2}#GT vs #eta_{1}-#eta_{2}", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
 	TH1D *hR2dEta_N = new TH1D("hR2dEta_N", "NBINS vs #eta_{1}-#eta_{2}", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
 	TH1D *hR2dEtaBase = new TH1D("hR2dEtaBase", "#LTR_{2}#GT-Baseline vs #eta_{1}-#eta_{2}", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
 
-	TH1 * histograms[13] = {hMultGen, hEtaGen, hdEta, hEta1D, hEta2D, hEtaT2D, 
-		hR2, hC2, hCorr1D, hm2D, hR2dEta, hR2dEta_N, hR2dEtaBase};
-	resetHistograms(histograms, 13);
+	int freqNumBins	= 500;
+	float freqBinWidth = 0.0001; 
+	TH1D *hR2dEtaBaseValDist = new TH1D("hR2dEtaBaseValDist", "Frequency #LTR_{2}#GT-Baseline",
+			freqNumBins, -freqNumBins * freqBinWidth / 2., freqNumBins * freqBinWidth / 2.);
+	TH1 * histoResets[13] = {hMultGen, hEtaGen, hdEta, hEta1D, hEta2D, hEtaT2D, 
+		hR2, hC2, hCorr1D, hConst2D, hR2dEta, hR2dEta_N, hR2dEtaBase};
+	resetHistograms(histoResets, 13);
 
 	TH3D *hEta3D = new TH3D("hEta3D", "hEta3D", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
 	TH3D *hR3 = new TH3D("hR3", "hR3", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
 	TH3D *hEtaT3D = new TH3D("hEtaT3D", "hEtaT3D", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
 	TH3D *hC2rho1 = new TH3D("hC2rho1","hC2rho1", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
-	TH3D *hm3D = new TH3D("hm3D", "hm3D", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
+	TH3D *hConst3D = new TH3D("hConst3D", "hConst3D", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
 	TH2D *hR3dEta = new TH2D("hR3dEta", "#LTR_{3}#GT vs (#Delta#eta_{12}, #Delta#eta_{13})", 2 * NBETA - 1, -2. * ETAMAX, 2.* ETAMAX, 2* NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
 	TH2D *hR3dEta_N	= new TH2D("hR3dEta_N", "NBINS vs (#Delta#eta_{12}, #Delta#eta_{13})", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX, 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
-		
-	int freqNumBins	= 500;
-	float freqBinWidth = 0.0001; 
-	TH1D *hR2dEtaBaseValDist = new TH1D("hR2dEtaBaseValDist", "Frequency #LTR_{2}#GT-Baseline",
-			freqNumBins, -freqNumBins * freqBinWidth / 2., freqNumBins * freqBinWidth / 2.);
 
 	const int N_EVENTS = 10000000;
-	      int N_TRACK = 4;
-	      int N_TRACK_PAIRS	= 0; // number of smeared dEta pairs added
+	      int N_TRACKS = 4;
+	      int N_TRACK_PAIRS	= 0;
 	
-	float *etaArr = new float[N_TRACK];
-	
+	float *etaArr = new float[N_TRACKS];
 	for(int iEvent = 0; iEvent < N_EVENTS; iEvent++) {
-		if(iEvent % (N_EVENTS / 10) == 0){ 
+		if(iEvent % (N_EVENTS / 10) == 0) { 
 			cout << "processing " << iEvent << " of " << N_EVENTS << endl; 
 		}
-		hMultGen->Fill(N_TRACK);
-		
-		for(int iTrack = 0; iTrack < N_TRACK - 2 * N_TRACK_PAIRS; iTrack++) {
-			float eta = -1.0 + 2.0 * gRandom->Rndm();			
-			hEtaGen->Fill(eta);
-			etaArr[iTrack] = eta;
-		}
-
-		std::random_shuffle(etaArr, etaArr + N_TRACK);
-
-		for(int i = 0; i < N_TRACK; i++) {
-			hEta1D->Fill(etaArr[i]);
-			
-			for(int j = 0; j < N_TRACK; j++) {
-				if(i != j) {
-					hdEta->Fill(etaArr[j] - etaArr[i]);
-					hEta2D->Fill(etaArr[i], etaArr[j]);
-					hR2->Fill(etaArr[i], etaArr[j]);
-					
-					for (int k = 0; k < N_TRACK; k++) {
-						if (i != k && j != k) {
-							hEta3D->Fill(etaArr[i], etaArr[j], etaArr[k]);
-							hR3->Fill(etaArr[i], etaArr[j], etaArr[k]);
-						}
-					}
-				}
-			}
-		}
-		
+		hMultGen->Fill(N_TRACKS);
+		etaArr = fillRandomRapidities(hEtaGen, N_TRACKS, N_TRACK_PAIRS);
+		std::random_shuffle(etaArr, etaArr + N_TRACKS);
+		fill1DRapidityDist(hEta1D, hdEta, etaArr, N_TRACKS);
+		fill2DRapidityDist(hEta2D, hR2, etaArr, N_TRACKS);
+		fill3DRapidityDist(hEta3D, hR3, etaArr, N_TRACKS);		
 	}
 
 	cout << "Normalizing..." << endl;
-	hEta1D->Scale(1. / N_EVENTS);
-	hEta2D->Scale(1. / N_EVENTS);
-	hEta3D->Scale(1. / N_EVENTS);
-	hR2->Scale(1. / N_EVENTS);
-	hR3->Scale(1. / N_EVENTS);
+	TH1 * histosNormalize[5] = {hEta1D, hEta2D, hEta3D, hR2, hR3};
+	normalizeHistograms(histosNormalize, N_EVENTS, 5);
 
-	cout << "Calculating rho1*rho1 & rho1*rho1*rho1..." << endl;
-	int nbin = hEta1D->GetNbinsX();
-	for(int ibin = 1; ibin <= nbin; ibin++) {
-		float valx1	= hEta1D->GetBinCenter(ibin);
-		float valn1	= hEta1D->GetBinContent(ibin);
-
-		for(int jbin = 1; jbin <= nbin; jbin++) {
-			float valx2	= hEta1D->GetBinCenter(jbin);
-			float valn2	= hEta1D->GetBinContent(jbin);
-			hEtaT2D->Fill(valx1, valx2, valn1 * valn2);
-			hm2D->Fill(valx1, valx2, -1.0);
-
-			for(int kbin = 1; kbin <= nbin; kbin++) {
-				float valx3	= hEta1D->GetBinCenter(kbin);
-				float valn3	= hEta1D->GetBinContent(kbin);
-				hEtaT3D->Fill(valx1, valx2, valx3, valn1 * valn2 * valn3);
-				hm3D->Fill(valx1, valx2, valx3, +2.);
-			}
-		}
-	}
+	cout << "Calculating rho1^2 & rho1^3 Tensor Products..." << endl;
+	fill2DTensorProduct(hEtaT2D, hEta1D);
+	fill3DTensorProduct(hEtaT3D, hEta1D);
+	fillConstant2DHistogram(hConst2D, -1.0, hEta1D);
+	fillConstant3DHistogram(hConst3D, +2.0, hEta1D);
 
 	cout << "Calculating C2rho1..." << endl;
-	float valxi, valxj, valxk, valnij, valnk;
-	for(int ibin = 1; ibin <= nbin; ibin++) {
-		for(int jbin = 1; jbin <= nbin; jbin++) {
-			valxi = hEta2D->GetXaxis()->GetBinCenter(ibin);
-			valxj = hEta2D->GetYaxis()->GetBinCenter(jbin);
-			valnij = hEta2D->GetBinContent(ibin, jbin);
-
-			for(int kbin = 1; kbin <= nbin; kbin++) {
-				valxk = hEta1D->GetBinCenter(kbin);
-				valnk = hEta1D->GetBinContent(kbin);
-				hC2rho1->Fill(valxi, valxj, valxk, valnij * valnk);
-			}
-		}
-	}
+	fillC2rho1Histogram(hC2rho1, hEta2D, hEta1D);
 	
 	cout<<"Calculating R2 and R3..."<<endl;
-	hR2->Divide(hEtaT2D);
-	hR2->Add(hm2D);
-	
-	hR3->Divide(hEtaT3D);
-	hC2rho1->Divide(hEtaT3D);
-	hC2rho1->Scale(3.0);
-	hR3->Add(hC2rho1,-1.);
-	hR3->Add(hm3D);
+	calculateR2Histogram(hR2, hEtaT2D, hConst2D);
+	calculateR3Histogram(hR3, hEtaT3D, hC2rho1, hConst3D);
 		
 	cout<<"Calculating Baselines..."<<endl;
 	float baseC2 = getC2Baseline(hMultGen);
 	float baseC3 = getC3Baseline(hMultGen);
-	for(int ibx = 1; ibx <= NBETA; ibx++) {
-		for (int iby = 1; iby <= NBETA; iby++) {
-			float oval2	= hR2->GetBinContent(ibx, iby);
-			hR2->SetBinContent(ibx, iby, oval2 - baseC2);
-
-			for(int ibz = 1; ibz <= NBETA; ibz++) {
-				float oval3	= hR3->GetBinContent(ibx, iby, ibz);
-				hR3->SetBinContent(ibx, iby, ibz, oval3 - baseC3);
-			}
-		}
-	}
+	applyC2BaselineAdjustment(hR2, baseC2, NBETA);
+	applyC3BaselineAdjustment(hR3, baseC3, NBETA);
 
 	cout<<"Averaging in dEta slices..."<<endl;
 	for(int ibx = 1; ibx <= NBETA; ibx++) {								// x-bin
@@ -331,6 +272,7 @@ float etaCorrelations() {
 	}
 	
 	delete[] binXVals;
+	delete[] etaArr;
 	return rms;
 	
 }
@@ -372,6 +314,221 @@ void setupOutputFilePaths(TString &plotFile0, TString &plotFile,
 	}
 }
 
+float * fillRandomRapidities(TH1D* hEtaGen, int N_TRACKS, int N_TRACK_PAIRS) {
+	float *etaArr = new float[N_TRACKS];
+	for(int iTrack = 0; iTrack < N_TRACKS - 2 * N_TRACK_PAIRS; iTrack++) {
+		float eta = -1.0 + 2.0 * gRandom->Rndm();			
+		hEtaGen->Fill(eta);
+		etaArr[iTrack] = eta;
+	}
+	return etaArr;
+}
+
+void fill1DRapidityDist(TH1D *hEta1D, TH1D *hdEta, float * etaArr, int N_TRACKS) {
+	for(int i = 0; i < N_TRACKS; i++) {
+		hEta1D->Fill(etaArr[i]);
+		
+		for(int j = 0; j < N_TRACKS; j++) {
+			if(i != j) {
+				hdEta->Fill(etaArr[j] - etaArr[i]);
+			}
+		}
+	}
+}
+
+void fill2DRapidityDist(TH2D *hEta2D, TH2D *hR2, float * etaArr, int N_TRACKS) {
+	for(int i = 0; i < N_TRACKS; i++) {			
+		for(int j = 0; j < N_TRACKS; j++) {
+			if(i != j) {
+				hEta2D->Fill(etaArr[i], etaArr[j]);
+				hR2->Fill(etaArr[i], etaArr[j]);
+			}
+		}
+	}
+}
+
+void fill3DRapidityDist(TH3D *hEta3D, TH3D *hR3, float * etaArr, int N_TRACKS) {
+	for(int i = 0; i < N_TRACKS; i++) {
+		for(int j = 0; j < N_TRACKS; j++) {
+			for (int k = 0; k < N_TRACKS; k++) {
+				if (i != j && i != k && j != k) {
+					hEta3D->Fill(etaArr[i], etaArr[j], etaArr[k]);
+					hR3->Fill(etaArr[i], etaArr[j], etaArr[k]);
+				}
+			}
+		}
+	}
+}
+
+void normalizeHistograms(TH1 **histos, int normConst, int size) {
+	for(int i = 0; i < size; i++) {
+		histos[i]->Scale(1. / normConst);
+	}
+}
+
+void fill2DTensorProduct(TH2D *hEtaT2D, TH1D *hEta1D) {
+	int nbin = hEta1D->GetNbinsX();
+	for(int ibin = 1; ibin <= nbin; ibin++) {
+		float valx1	= hEta1D->GetBinCenter(ibin);
+		float valn1	= hEta1D->GetBinContent(ibin);
+		for(int jbin = 1; jbin <= nbin; jbin++) {
+			float valx2	= hEta1D->GetBinCenter(jbin);
+			float valn2	= hEta1D->GetBinContent(jbin);
+			hEtaT2D->Fill(valx1, valx2, valn1 * valn2);
+		}
+	}
+}
+
+void fill3DTensorProduct(TH3D *hEtaT3D, TH1D *hEta1D) {
+	int nbin = hEta1D->GetNbinsX();
+	for(int ibin = 1; ibin <= nbin; ibin++) {
+		float valx1	= hEta1D->GetBinCenter(ibin);
+		float valn1	= hEta1D->GetBinContent(ibin);
+		for(int jbin = 1; jbin <= nbin; jbin++) {
+			float valx2	= hEta1D->GetBinCenter(jbin);
+			float valn2	= hEta1D->GetBinContent(jbin);
+			for(int kbin = 1; kbin <= nbin; kbin++) {
+				float valx3	= hEta1D->GetBinCenter(kbin);
+				float valn3	= hEta1D->GetBinContent(kbin);
+				hEtaT3D->Fill(valx1, valx2, valx3, valn1 * valn2 * valn3);
+			}
+		}
+	}
+}
+
+void fillConstant2DHistogram(TH2D *hConst2D, float val, TH1D *hEta1D) {
+	int nbin = hEta1D->GetNbinsX();
+	for(int ibin = 1; ibin <= nbin; ibin++) {
+		float valx1	= hEta1D->GetBinCenter(ibin);
+		for(int jbin = 1; jbin <= nbin; jbin++) {
+			float valx2	= hEta1D->GetBinCenter(jbin);
+			hConst2D->Fill(valx1, valx2, val);
+		}
+	}
+}
+
+void fillConstant3DHistogram(TH3D* hConst3D, float val, TH1D *hEta1D) {
+	int nbin = hEta1D->GetNbinsX();
+	for(int ibin = 1; ibin <= nbin; ibin++) {
+		float valx1	= hEta1D->GetBinCenter(ibin);
+		for(int jbin = 1; jbin <= nbin; jbin++) {
+			float valx2	= hEta1D->GetBinCenter(jbin);
+			for(int kbin = 1; kbin <= nbin; kbin++) {
+				float valx3	= hEta1D->GetBinCenter(kbin);
+				hConst3D->Fill(valx1, valx2, valx3, val);
+			}
+		}
+	}
+}
+
+void fillC2rho1Histogram(TH3D *hC2rho1, TH2D *hEta2D, TH1D *hEta1D) {
+	int nbin = hEta1D->GetNbinsX();
+	float valxi, valxj, valxk, valnij, valnk;
+	for(int ibin = 1; ibin <= nbin; ibin++) {
+		for(int jbin = 1; jbin <= nbin; jbin++) {
+			valxi = hEta2D->GetXaxis()->GetBinCenter(ibin);
+			valxj = hEta2D->GetYaxis()->GetBinCenter(jbin);
+			valnij = hEta2D->GetBinContent(ibin, jbin);
+
+			for(int kbin = 1; kbin <= nbin; kbin++) {
+				valxk = hEta1D->GetBinCenter(kbin);
+				valnk = hEta1D->GetBinContent(kbin);
+				hC2rho1->Fill(valxi, valxj, valxk, valnij * valnk);
+			}
+		}
+	}
+}
+
+void calculateR2Histogram(TH2D *hR2, TH2D *hEtaT2D, TH2D *hConst2D) {
+	hR2->Divide(hEtaT2D);
+	hR2->Add(hConst2D);
+}
+
+void calculateR3Histogram(TH3D *hR3, TH3D *hEtaT3D, TH3D *hC2rho1, TH3D *hConst3D) {
+	hR3->Divide(hEtaT3D);
+	hC2rho1->Divide(hEtaT3D);
+	hC2rho1->Scale(3.0);
+	hR3->Add(hC2rho1, -1.0);
+	hR3->Add(hConst3D);
+}
+
+float getC2Baseline(TH1D *hmult){
+	if(!hmult) { exit(0); }
+	float nent = (float)hmult->GetEntries();
+	if(!nent) {exit(0); }
+	TH1D *hMultWork	= (TH1D*)hmult->Clone("hMultWork");
+	hMultWork->Scale(1. / nent);
+	int nBinsX = hMultWork->GetNbinsX();
+
+	float sumNum = 0;
+	float sumDen = 0;
+	float result = 0;
+
+	for(int ibx = 1; ibx <= nBinsX; ibx++) {
+		float ni = hMultWork->GetBinCenter(ibx);
+		float yi = hMultWork->GetBinContent(ibx);		
+		sumNum += yi * ni * (ni - 1.);
+		sumDen += yi * ni;
+	}
+	if(sumDen != 0.0) {
+		result = sumNum / sumDen / sumDen - 1.;
+	}
+	delete hMultWork; hMultWork = 0;
+	return result;
+}
+
+float getC3Baseline(TH1D *hmult){
+	if(!hmult) { exit(0); }
+	float nent = (float)hmult->GetEntries();
+	if(!nent) { exit(0); }
+	TH1D *hMultWork	= (TH1D*)hmult->Clone("hMultWork");
+	hMultWork->Scale(1./nent);
+	int nBinsX = hMultWork->GetNbinsX();
+
+	float sumNum3 = 0;
+	float sumNum2 = 0;
+	float sumDen = 0;
+
+	for(int ibx = 1; ibx <= nBinsX; ibx++) {
+		float ni = hMultWork->GetBinCenter(ibx);		
+		float yi = hMultWork->GetBinContent(ibx);		
+		sumNum3 += yi * ni * (ni - 1.) * (ni - 2.);
+		sumNum2	+= yi * ni * (ni - 1.);
+		sumDen += yi * ni;
+	}
+
+	float result = 0;
+	float term3 = 0;
+	float term2	= 0;
+
+	if(sumDen != 0.0) {
+		term3 = sumNum3 / sumDen / sumDen / sumDen;
+		term2 = sumNum2 / sumDen / sumDen;
+		result = term3 - 3 * term2 + 2.;
+	}
+	delete hMultWork; hMultWork=0;
+	return result;
+}
+
+void applyC2BaselineAdjustment(TH2D *hR2, float baseC2, int NBETA) {
+	for(int ibx = 1; ibx <= NBETA; ibx++) {
+		for (int iby = 1; iby <= NBETA; iby++) {
+			float oval2	= hR2->GetBinContent(ibx, iby);
+			hR2->SetBinContent(ibx, iby, oval2 - baseC2);
+		}
+	}
+}
+void applyC3BaselineAdjustment(TH3D *hR3, float baseC3, int NBETA) {
+	for(int ibx = 1; ibx <= NBETA; ibx++) {
+		for (int iby = 1; iby <= NBETA; iby++) {
+			for(int ibz = 1; ibz <= NBETA; ibz++) {
+				float oval3	= hR3->GetBinContent(ibx, iby, ibz);
+				hR3->SetBinContent(ibx, iby, ibz, oval3 - baseC3);
+			}
+		}
+	}
+}
+
 void setStyle() {
 	gStyle->SetPaperSize(TStyle::kUSLetter);
 	gStyle->SetLabelSize(0.05,"X");
@@ -402,64 +559,4 @@ void setStyle() {
 	gStyle->SetHistMinimumZero(kFALSE);
 	gStyle->SetHatchesSpacing(2);
 	gStyle->SetHatchesLineWidth(2);
-}
-
-float getC2Baseline(TH1D *hmult){
-	if(!hmult) { 
-		exit(0); 
-	}
-	float nent = (float)hmult->GetEntries();
-	if(!nent) {
-		exit(0); 
-	}
-	TH1D *hMultWork	= (TH1D*)hmult->Clone("hMultWork");
-	hMultWork->Scale(1. / nent);
-	int nBinsX = hMultWork->GetNbinsX();
-	float sumNum = 0;
-	float sumDen = 0;
-	for(int ibx = 1; ibx <= nBinsX; ibx++) {
-		float ni = hMultWork->GetBinCenter(ibx);
-		float yi = hMultWork->GetBinContent(ibx);		
-		sumNum += yi * ni * (ni - 1.);
-		sumDen += yi * ni;
-	}
-	float result = 0;
-	if(sumDen != 0.0) {
-		result = sumNum / sumDen / sumDen - 1.;
-	}
-	delete hMultWork; hMultWork = 0;
-	return result;
-}
-
-float getC3Baseline(TH1D *hmult){
-	if(!hmult) { 
-		exit(0); 
-	}
-	float nent = (float)hmult->GetEntries();
-	if(!nent) { 
-		exit(0); 
-	}
-	TH1D *hMultWork	= (TH1D*)hmult->Clone("hMultWork");
-	hMultWork->Scale(1./nent);
-	int nBinsX = hMultWork->GetNbinsX();
-	float sumNum3 = 0;
-	float sumNum2 = 0;
-	float sumDen = 0;
-	for(int ibx = 1; ibx <= nBinsX; ibx++) {
-		float ni = hMultWork->GetBinCenter(ibx);		
-		float yi = hMultWork->GetBinContent(ibx);		
-		sumNum3 += yi * ni * (ni - 1.) * (ni - 2.);
-		sumNum2	+= yi * ni * (ni - 1.);
-		sumDen += yi * ni;
-	}
-	float result = 0;
-	float term3 = 0;
-	float term2	= 0;
-	if(sumDen != 0.0) {
-		term3 = sumNum3 / sumDen / sumDen / sumDen;
-		term2 = sumNum2 / sumDen / sumDen;
-		result = term3 - 3 * term2 + 2.;
-	}
-	delete hMultWork; hMultWork=0;
-	return result;
 }
