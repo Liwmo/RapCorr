@@ -17,7 +17,7 @@ void GetInfo(int geid, float px, float py, float pz, TString &name,
                 float &aeta, float &arap, float &aphi, 
                 float &aptot, float &apt, float &abn);
 
-void UrQMD_simpleread(){
+void UrQMD_simpleread() {
 	float amass, achg, alife, aeta, arap, aphi, aptot, apt, abn; 
 	TString aname;
 
@@ -64,7 +64,7 @@ void UrQMD_simpleread(){
 	TH1D *hpt	= new TH1D("hpt", "pt ditribution", 50, 0., 5.);
 
 	//---- start event loop...
-	int nb,nentries	= neventtree;
+	int nb, nentries	= neventtree;
 	for(Long64_t jentry = 0; jentry < nentries; jentry++) {
 		nb = chain->GetEntry(jentry);
 		if(jentry < 10) {
@@ -127,6 +127,7 @@ void UrQMD_simpleread(){
 	hpt->Draw();
 	canvas->cd(2);
 	hpid->Draw();
+}
 
 void GetInfo(int geid, float px, float py, float pz, 
         TString &name, float &amass, float &achg, float &alife,
