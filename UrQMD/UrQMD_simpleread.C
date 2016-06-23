@@ -64,7 +64,7 @@ void UrQMD_simpleread() {
 	TH1D *hpt	= new TH1D("hpt", "pt ditribution", 50, 0., 5.);
 
 	//---- start event loop...
-	int nb, nentries	= neventtree;
+	int nb, nentries = neventtree;
 	for(Long64_t jentry = 0; jentry < nentries; jentry++) {
 		nb = chain->GetEntry(jentry);
 		if(jentry < 10) {

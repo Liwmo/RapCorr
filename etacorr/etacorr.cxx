@@ -38,12 +38,22 @@ const int PLOT_ON = 1;
 #include "TApplication.h"
 using namespace std;
 
+struct TrackInfo {
+	int *geantID;
+	float *px, *py, *pz;
+	TString name;
+	float mass, charge, lifetime;
+    float eta, rapidity, phi;
+    float pTotal, pt, baryonNo;
+};
+
 void etaCorrelations();
-void setupUrQMDInputPath(TChain*);
+int addUrQMDEventsFromPath(TChain*);
 double * getXValsForLogAxis(int, float, float);
 void resetHistograms(TH1**, int);
 void setupOutputFilePaths(TString&, TString&, TString&, TString&);
-float * fillRandomRapidities(TH1D*, int, int); 
+void fillEventDataHistogram(TH1D*, TH1D*, TrackInfo&, int, int);
+float * fillRapidities(TH1D*, TrackInfo&, int, int); 
 void fill1DRapidityDist(TH1D*, TH1D*, float*, int);
 void fill2DRapidityDist(TH2D*, TH2D*, float*, int);
 void fill3DRapidityDist(TH3D*, TH3D*, float*, int);
@@ -72,7 +82,6 @@ void GetInfo(int geantID, float px, float py, float pz, TString &name,
                 float &eta, float &rapidity, float &phi, 
                 float &pTotal, float &pt, float &baryonNo);
 
-
 int main(int argc, char **argv) {
 	gRandom->SetSeed(123456);
 	etaCorrelations();
@@ -81,7 +90,7 @@ int main(int argc, char **argv) {
 
 void etaCorrelations() {
 	float mass, charge, lifetime, eta, rapidity, phi, pTotal, pt, baryonNo; 
-	TString aname;
+	TString name;
 
 	Int_t ievt;
 	Float_t parimp;
@@ -104,7 +113,7 @@ void etaCorrelations() {
 	TBranch *b_gpz;      
 
 	TChain *chain = new TChain("h1", "events chain");
-	setupUrQMDInputPath(chain);
+	int nb, nentries = addUrQMDEventsFromPath(chain);
 
 	chain->SetMakeClass(1);
 	chain->SetBranchAddress("ievt", &ievt, &b_ievt);
@@ -164,21 +173,40 @@ void etaCorrelations() {
 	TH2D *hR3dEta = new TH2D("hR3dEta", "#LTR_{3}#GT vs (#Delta#eta_{12}, #Delta#eta_{13})", 2 * NBETA - 1, -2. * ETAMAX, 2.* ETAMAX, 2* NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
 	TH2D *hR3dEta_N	= new TH2D("hR3dEta_N", "NBINS vs (#Delta#eta_{12}, #Delta#eta_{13})", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX, 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
 
-	const int N_EVENTS = 10000000;
-	      int N_TRACKS = 4;
-	      int N_TRACK_PAIRS	= 0;
-	
-	float *etaArr = new float[N_TRACKS];
-	for(int iEvent = 0; iEvent < N_EVENTS; iEvent++) {
+	const int N_EVENTS = nentries;
+	TrackInfo trackInfo = {igid, gpx, gpy, gpz, name, mass, charge, 
+	lifetime, eta, rapidity, phi, pTotal, pt, baryonNo};
+
+	for(Long64_t iEvent = 0; iEvent < N_EVENTS; iEvent++) {
 		if(iEvent % (N_EVENTS / 10) == 0) { 
 			cout << "processing " << iEvent << " of " << N_EVENTS << endl; 
 		}
+
+		nb = chain->GetEntry(iEvent);
+		int N_TRACKS = mpart;
+	    int N_TRACK_PAIRS	= 0;
+	    float *etaArr = new float[N_TRACKS];
+
+		if(iEvent < 10) {
+			cout << "entry=" << iEvent
+				 << "  ievt=" << ievt
+				 << "  Ecm=" << gecm
+				 << "  mpart=" << mpart
+				 << "  b=" << parimp
+				 << "  refmult= " << evinfo[0]
+				 << "  refmult2=" << evinfo[1]
+				 << "  refmult3=" << evinfo[2]
+				 << "  itotcoll=" << evinfo[3]
+				 << endl;
+		}
 		hMultGen->Fill(N_TRACKS);
-		etaArr = fillRandomRapidities(hEtaGen, N_TRACKS, N_TRACK_PAIRS);
+		fillEventDataHistogram(hPt, hPartID, trackInfo, N_TRACKS, N_TRACK_PAIRS);
+		etaArr = fillRapidities(hEtaGen, trackInfo, N_TRACKS, N_TRACK_PAIRS);
 		std::random_shuffle(etaArr, etaArr + N_TRACKS);
 		fill1DRapidityDist(hEta1D, hdEta, etaArr, N_TRACKS);
 		fill2DRapidityDist(hEta2D, hR2, etaArr, N_TRACKS);
-		fill3DRapidityDist(hEta3D, hR3, etaArr, N_TRACKS);		
+		//fill3DRapidityDist(hEta3D, hR3, etaArr, N_TRACKS);	
+		delete[] etaArr; etaArr = 0;	
 	}
 
 	cout << "Normalizing..." << endl;
@@ -224,11 +252,10 @@ void etaCorrelations() {
 	if(PLOT_ON) {cout << "You plotted " << iCanvas << " canvases..." << endl;}
 	
 	delete[] binXVals;
-	delete[] etaArr;	
 }
 
 
-void setupUrQMDInputPath(TChain *chain) {
+int addUrQMDEventsFromPath(TChain *chain) {
     TString path = TString("../UrQMD/events/");
 	TString	filenames = TString("urqmd_23_0099_*.root");
 	TString input = path + filenames;
@@ -236,6 +263,7 @@ void setupUrQMDInputPath(TChain *chain) {
 	chain->Add(input.Data());
 	int neventtree = chain->GetEntries();
 	cout << "N_events = " << neventtree << endl;
+	return neventtree;
 }
 
 double * getXValsForLogAxis(int numBins, float axis1, float axis2) {
@@ -275,14 +303,27 @@ void setupOutputFilePaths(TString &plotFile0, TString &plotFile,
 	}
 }
 
+void fillEventDataHistogram(TH1D *hPt, TH1D *hPartID, TrackInfo &info, int N_TRACKS, int N_TRACK_PAIRS) {
+	for(int iTrack = 0; iTrack < N_TRACKS - 2 * N_TRACK_PAIRS; iTrack++) {
+		
+		GetInfo(info.geantID[iTrack], info.px[iTrack], info.py[iTrack], info.pz[iTrack], 
+		info.name, info.mass, info.charge, info.lifetime, info.eta, info.rapidity, info.phi, info.pTotal, info.pt, info.baryonNo);
+		
+		hPt->Fill(std::sqrt(info.px[iTrack] * info.px[iTrack] + info.py[iTrack] * info.py[iTrack]));
+		hPartID->Fill(info.geantID[iTrack]);		
+	}
+}
 
 
-float * fillRandomRapidities(TH1D* hEtaGen, int N_TRACKS, int N_TRACK_PAIRS) {
+float * fillRapidities(TH1D *hEtaGen, TrackInfo &info, int N_TRACKS, int N_TRACK_PAIRS) {
 	float *etaArr = new float[N_TRACKS];
 	for(int iTrack = 0; iTrack < N_TRACKS - 2 * N_TRACK_PAIRS; iTrack++) {
-		float eta = -1.0 + 2.0 * gRandom->Rndm();			
-		hEtaGen->Fill(eta);
-		etaArr[iTrack] = eta;
+		if(info.geantID[iTrack] == 14) { //proton only
+			GetInfo(info.geantID[iTrack], info.px[iTrack], info.py[iTrack], info.pz[iTrack], 
+		info.name, info.mass, info.charge, info.lifetime, info.eta, info.rapidity, info.phi, info.pTotal, info.pt, info.baryonNo);
+		}
+		hEtaGen->Fill(info.eta);
+		etaArr[iTrack] = info.eta;
 	}
 	return etaArr;
 }
