@@ -53,7 +53,7 @@ double * getXValsForLogAxis(int, float, float);
 void resetHistograms(TH1**, int);
 void setupOutputFilePaths(TString&, TString&, TString&, TString&);
 void fillEventDataHistogram(TH1D*, TH1D*, TrackInfo&, int, int);
-float * fillRapidities(TH1D*, TrackInfo&, int, int); 
+float * fillRapidities(TH1D*, TrackInfo&, TH1D*, int, int); 
 void fill1DRapidityDist(TH1D*, TH1D*, float*, int);
 void fill2DRapidityDist(TH2D*, TH2D*, float*, int);
 void fill3DRapidityDist(TH3D*, TH3D*, float*, int);
@@ -143,7 +143,7 @@ void etaCorrelations() {
 
 	const int NBETA	= 35;
 	const float ETAMAX = 0.7;
-	TH1D *hMultGen = new TH1D("hMultGen", "hMultGen", 80, -0.5, 79.5);
+	TH1D *hMultGen = new TH1D("hMultGen", "hMultGen", 200, -0.5, 199.5);
 	TH1D *hEtaGen = new TH1D("hEtaGen", "Generated #eta", NBETA, -ETAMAX, ETAMAX);
 	TH1D *hdEta	= new TH1D("hdEta", "#Delta#eta", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
 	TH1D *hEta1D = new TH1D("hEta1D", "hEta1D", NBETA, -ETAMAX, ETAMAX);
@@ -184,25 +184,17 @@ void etaCorrelations() {
 
 		nb = chain->GetEntry(iEvent);
 		int N_TRACKS = mpart;
-	    int N_TRACK_PAIRS	= 0;
+	    int N_TRACK_PAIRS = 0;
 	    float *etaArr = new float[N_TRACKS];
 
 		if(iEvent < 10) {
 			cout << "entry=" << iEvent
-				 << "  ievt=" << ievt
-				 << "  Ecm=" << gecm
-				 << "  mpart=" << mpart
-				 << "  b=" << parimp
-				 << "  refmult= " << evinfo[0]
-				 << "  refmult2=" << evinfo[1]
-				 << "  refmult3=" << evinfo[2]
-				 << "  itotcoll=" << evinfo[3]
+				 << " mpart=" << mpart
 				 << endl;
 		}
-		hMultGen->Fill(N_TRACKS);
+
 		fillEventDataHistogram(hPt, hPartID, trackInfo, N_TRACKS, N_TRACK_PAIRS);
-		etaArr = fillRapidities(hEtaGen, trackInfo, N_TRACKS, N_TRACK_PAIRS);
-		std::random_shuffle(etaArr, etaArr + N_TRACKS);
+		etaArr = fillRapidities(hEtaGen, trackInfo, hMultGen, N_TRACKS, N_TRACK_PAIRS);
 		fill1DRapidityDist(hEta1D, hdEta, etaArr, N_TRACKS);
 		fill2DRapidityDist(hEta2D, hR2, etaArr, N_TRACKS);
 		//fill3DRapidityDist(hEta3D, hR3, etaArr, N_TRACKS);	
@@ -215,16 +207,16 @@ void etaCorrelations() {
 
 	cout << "Calculating rho1^2 & rho1^3 Tensor Products..." << endl;
 	fill2DTensorProduct(hEtaT2D, hEta1D);
-	fill3DTensorProduct(hEtaT3D, hEta1D);
+	//fill3DTensorProduct(hEtaT3D, hEta1D);
 	fillConstant2DHistogram(hConst2D, -1.0, hEta1D);
-	fillConstant3DHistogram(hConst3D, +2.0, hEta1D);
+	//fillConstant3DHistogram(hConst3D, +2.0, hEta1D);
 
 	cout << "Calculating C2rho1..." << endl;
 	fillC2rho1Histogram(hC2rho1, hEta2D, hEta1D);
 	
 	cout<<"Calculating R2 and R3..."<<endl;
 	calculateR2Histogram(hR2, hEtaT2D, hConst2D);
-	calculateR3Histogram(hR3, hEtaT3D, hC2rho1, hConst3D);
+	//calculateR3Histogram(hR3, hEtaT3D, hC2rho1, hConst3D);
 		
 	cout<<"Calculating Baselines..."<<endl;
 	float baseC2 = getC2Baseline(hMultGen);
@@ -315,16 +307,19 @@ void fillEventDataHistogram(TH1D *hPt, TH1D *hPartID, TrackInfo &info, int N_TRA
 }
 
 
-float * fillRapidities(TH1D *hEtaGen, TrackInfo &info, int N_TRACKS, int N_TRACK_PAIRS) {
+float * fillRapidities(TH1D *hEtaGen, TrackInfo &info, TH1D* hMultGen, int N_TRACKS, int N_TRACK_PAIRS) {
 	float *etaArr = new float[N_TRACKS];
-	for(int iTrack = 0; iTrack < N_TRACKS - 2 * N_TRACK_PAIRS; iTrack++) {
+	int protons = 0;
+	for(int iTrack = 0; iTrack < N_TRACKS; iTrack++) {
 		if(info.geantID[iTrack] == 14) { //proton only
+			protons++;
 			GetInfo(info.geantID[iTrack], info.px[iTrack], info.py[iTrack], info.pz[iTrack], 
-		info.name, info.mass, info.charge, info.lifetime, info.eta, info.rapidity, info.phi, info.pTotal, info.pt, info.baryonNo);
+				info.name, info.mass, info.charge, info.lifetime, info.eta, info.rapidity, info.phi, info.pTotal, info.pt, info.baryonNo);
+			hEtaGen->Fill(info.rapidity);
+			etaArr[iTrack] = info.rapidity;
 		}
-		hEtaGen->Fill(info.eta);
-		etaArr[iTrack] = info.eta;
 	}
+	hMultGen->Fill(protons);
 	return etaArr;
 }
 
@@ -472,7 +467,8 @@ void fillR2dEtaHistogram(TH1D *hR2dEta, TH1D *hR2dEta_N, TH2D *hR2, int NBETA) {
 			hR2dEta->Fill(dEtaXY, hR2->GetBinContent(ibx, iby));
 			hR2dEta_N->Fill(dEtaXY, 1.0);
 		}	
-	}
+	} 
+	hR2dEta->Divide(hR2dEta_N);
 }
 
 void fillR3dEtaHistogram(TH2D *hR3dEta, TH2D *hR3dEta_N, TH3D *hR3, int NBETA) {
@@ -635,14 +631,14 @@ void drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile0,
 		canvases[iCanvas]->cd(); 
 		canvases[iCanvas]->Divide(3,2,0.0001,0.0001);
 			canvases[iCanvas]->cd(1);
+				hMultGen->Draw();
+			canvases[iCanvas]->cd(2);
 				hEtaGen->SetMinimum(0.5);
 				hEtaGen->SetStats(0);
 				hEtaGen->Draw();
-			canvases[iCanvas]->cd(2);
+			canvases[iCanvas]->cd(3);
 				hEta2D->SetStats(0);
 				hEta2D->Draw("colz");
-			canvases[iCanvas]->cd(3);
-				hMultGen->Draw();
 			canvases[iCanvas]->cd(4);
 				hR2dEtaBaseValDist->Draw();
 			canvases[iCanvas]->cd(5);
