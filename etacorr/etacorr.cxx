@@ -158,7 +158,7 @@ void etaCorrelations() {
 	TH1D *hR2dEtaBase = new TH1D("hR2dEtaBase", "#LTR_{2}#GT-Baseline vs #eta_{1}-#eta_{2}", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
 
 	int freqNumBins	= 500;
-	float freqBinWidth = 0.0001; 
+	float freqBinWidth = 0.01; 
 	TH1D *hR2dEtaBaseValDist = new TH1D("hR2dEtaBaseValDist", "Frequency #LTR_{2}#GT-Baseline",
 			freqNumBins, -freqNumBins * freqBinWidth / 2., freqNumBins * freqBinWidth / 2.);
 	TH1 * histoResets[14] = {hMultGen, hEtaGen, hdEta, hEta1D, hEta2D, hEtaT2D, 
@@ -234,11 +234,11 @@ void etaCorrelations() {
 	cout << "Preparing files..." << endl;
 	setStyle();
 	drawR2HistogramsToFile(canvases, iCanvas, plotFile0, hEtaGen, hEta2D, hMultGen, 
-		hR2dEtaBaseValDist, hR2, hR2dEta);
+		hR2dEtaBaseValDist, hR2, hR2dEtaBase);
 	drawR3HistogramsToFile(canvases, iCanvas, plotFile, hR2dEtaBase, 
 		hR3dEta, hR3dEta_N);
 	executeFilePlots(canvases, iCanvas, plotFileC, plotFile, plotFilePDF);
-		
+
 	delete[] binXVals;
 }
 
@@ -621,7 +621,7 @@ void setStyle() {
 }
 
 void drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile0, TH1D *hEtaGen, TH2D *hEta2D, 
-	TH1D *hMultGen, TH1D* hR2dEtaBaseValDist, TH2D* hR2, TH1D* hR2dEta) {
+	TH1D *hMultGen, TH1D* hR2dEtaBaseValDist, TH2D* hR2, TH1D* hR2dEtaBase) {
 	if(PLOT_ON) {
 		char buf[200];
 		iCanvas++;
@@ -638,19 +638,19 @@ void drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile0,
 				hEta2D->SetStats(0);
 				hEta2D->Draw("colz");
 			canvases[iCanvas]->cd(4);
-				hR2dEtaBaseValDist->Draw();
-			canvases[iCanvas]->cd(5);
 				hR2->SetStats(0);
 				hR2->Draw("colz");
+			canvases[iCanvas]->cd(5);
+				hR2dEtaBase->SetStats(0);
+				hR2dEtaBase->SetMinimum(0);
+				hR2dEtaBase->SetMaximum(2);
+				hR2dEtaBase->SetMarkerStyle(20);
+				hR2dEtaBase->SetMarkerSize(1);
+				hR2dEtaBase->SetMarkerColor(4);
+				hR2dEtaBase->SetLineColor(4);
+				hR2dEtaBase->Draw("hist");
 			canvases[iCanvas]->cd(6);
-				hR2dEta->SetStats(0);
-				// hR2dEta->SetMinimum(-2);
-				// hR2dEta->SetMaximum( 2);
-				hR2dEta->SetMarkerStyle(20);
-				hR2dEta->SetMarkerSize(1);
-				hR2dEta->SetMarkerColor(4);
-				hR2dEta->SetLineColor(4);
-				hR2dEta->Draw("hist");
+				hR2dEtaBaseValDist->Draw();
 		canvases[iCanvas]->cd(); 
 		canvases[iCanvas]->Update();
 		canvases[iCanvas]->Print(plotFile0.Data());
