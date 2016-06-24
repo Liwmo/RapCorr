@@ -235,8 +235,8 @@ void etaCorrelations() {
 	setStyle();
 	drawR2HistogramsToFile(canvases, iCanvas, plotFile0, hEtaGen, hEta2D, hMultGen, 
 		hR2dEtaBaseValDist, hR2, hR2dEtaBase);
-	drawR3HistogramsToFile(canvases, iCanvas, plotFile, hR2dEtaBase, 
-		hR3dEta, hR3dEta_N);
+	//drawR3HistogramsToFile(canvases, iCanvas, plotFile, hR2dEtaBase, 
+	//	hR3dEta, hR3dEta_N);
 	executeFilePlots(canvases, iCanvas, plotFileC, plotFile, plotFilePDF);
 
 	delete[] binXVals;
@@ -577,12 +577,11 @@ void fillR2EtaBaseHistogram(TH1D *hR2dEtaBase, TH1D *hR2dEta) {
 }
 
 void fillR2EtaBaseValDistHistogram(TH1D *hR2dEtaBaseValDist, TH1D *hR2dEta) {
+	int count = 0;
 	for(int ibin = 1; ibin <= hR2dEta->GetNbinsX(); ibin++) {
 		float dEta = hR2dEta->GetBinCenter(ibin);
 		float val = hR2dEta->GetBinContent(ibin);
-		if(dEta >= 0.0) {
-			hR2dEtaBaseValDist->Fill(val);
-		}
+		hR2dEtaBaseValDist->Fill(val);
 	}
 }
 
