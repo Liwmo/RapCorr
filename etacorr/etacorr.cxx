@@ -77,10 +77,8 @@ void setStyle();
 void drawR2HistogramsToFile(TCanvas**, int&, TString, TH1D*, TH2D*, TH1D*, TH1D*, TH2D*, TH1D*);
 void drawR3HistogramsToFile(TCanvas**, int&, TString, TH1D*, TH2D*, TH2D*);
 void executeFilePlots(TCanvas**, int, TString, TString, TString);
-void GetInfo(int geantID, float px, float py, float pz, TString &name, 
-	            float &mass, float &charge, float &lifetime,
-                float &eta, float &rapidity, float &phi, 
-                float &pTotal, float &pt, float &baryonNo);
+void GetInfo(int, float, float, float, TString&, float&, float&, float&,
+                float&, float&, float&, float&, float&, float&);
 
 int main(int argc, char **argv) {
 	gRandom->SetSeed(123456);
@@ -194,6 +192,10 @@ void etaCorrelations() {
 		}
 
 		//fillEventDataHistogram(hPt, hPartID, trackInfo, N_TRACKS);
+		if(parimp > 3.2) {
+			delete[] etaArr; etaArr = 0;	
+			continue; // allow only 0-5% central collisions...  
+		} 
 		etaArr = fillRapidities(hEtaGen, trackInfo, hMultGen, N_TRACKS, N_PROTON_TRACKS);
 		fill1DRapidityDist(hEta1D, hdEta, etaArr, N_PROTON_TRACKS);
 		fill2DRapidityDist(hEta2D, hR2, etaArr, N_PROTON_TRACKS);
@@ -307,16 +309,17 @@ float * fillRapidities(TH1D *hEtaGen, TrackInfo &info, TH1D* hMultGen, int N_TRA
 	float *etaArr = new float[N_TRACKS];
 	int protonCount = 0; 
 	const int PROTON = 14;
+
 	for(int iTrack = 0; iTrack < N_TRACKS; iTrack++) {
-		if(info.geantID[iTrack] == PROTON) { 
-			GetInfo(info.geantID[iTrack], info.px[iTrack], info.py[iTrack], info.pz[iTrack], 
+		GetInfo(info.geantID[iTrack], info.px[iTrack], info.py[iTrack], info.pz[iTrack], 
 			info.name, info.mass, info.charge, info.lifetime, info.eta, info.rapidity, info.phi, info.pTotal, info.pt, info.baryonNo);
-			hEtaGen->Fill(info.rapidity);
+		if(info.geantID[iTrack] == PROTON && abs(info.rapidity) <= 1.0) { 
+			hEtaGen->Fill(info.rapidity);			
 			etaArr[protonCount] = info.rapidity;
 			protonCount++;
 		}
 	}
-	hMultGen->Fill(protonCount);
+	hMultGen->Fill(protonCount);	
 	N_PROTON_TRACKS = protonCount;
 	return etaArr;
 }
@@ -641,8 +644,8 @@ void drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile0,
 				hR2->Draw("colz");
 			canvases[iCanvas]->cd(5);
 				hR2dEtaBase->SetStats(0);
-				hR2dEtaBase->SetMinimum(0);
-				hR2dEtaBase->SetMaximum(2);
+				hR2dEtaBase->SetMinimum(-1);
+				hR2dEtaBase->SetMaximum(100);
 				hR2dEtaBase->SetMarkerStyle(20);
 				hR2dEtaBase->SetMarkerSize(1);
 				hR2dEtaBase->SetMarkerColor(4);
