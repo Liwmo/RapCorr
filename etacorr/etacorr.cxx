@@ -141,7 +141,7 @@ void etaCorrelations() {
 
 	const int NBETA	= 40;
 	const float ETAMAX = 1.0;
-	TH1D *hMultGen = new TH1D("hMultGen", "hMultGen", 200, -0.5, 199.5);
+	TH1D *hMultGen = new TH1D("hMultGen", "hMultGen", 100, -0.5, 99.5);
 	TH1D *hEtaGen = new TH1D("hEtaGen", "Generated #eta", NBETA, -ETAMAX, ETAMAX);
 	TH1D *hdEta	= new TH1D("hdEta", "#Delta#eta", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
 	TH1D *hEta1D = new TH1D("hEta1D", "hEta1D", NBETA, -ETAMAX, ETAMAX);
@@ -156,7 +156,7 @@ void etaCorrelations() {
 	TH1D *hR2dEtaBase = new TH1D("hR2dEtaBase", "#LTR_{2}#GT-Baseline vs #eta_{1}-#eta_{2}", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
 
 	int freqNumBins	= 500;
-	float freqBinWidth = 0.01; 
+	float freqBinWidth = 0.001; 
 	TH1D *hR2dEtaBaseValDist = new TH1D("hR2dEtaBaseValDist", "Frequency #LTR_{2}#GT-Baseline",
 			freqNumBins, -freqNumBins * freqBinWidth / 2., freqNumBins * freqBinWidth / 2.);
 	TH1 * histoResets[14] = {hMultGen, hEtaGen, hdEta, hEta1D, hEta2D, hEtaT2D, 
@@ -172,6 +172,7 @@ void etaCorrelations() {
 	TH2D *hR3dEta_N	= new TH2D("hR3dEta_N", "NBINS vs (#Delta#eta_{12}, #Delta#eta_{13})", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX, 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
 
 	const int N_EVENTS = nentries;
+	int N_CENTRAL_EVENTS = 0;
 	TrackInfo trackInfo = {igid, gpx, gpy, gpz, name, mass, charge, 
 	lifetime, eta, rapidity, phi, pTotal, pt, baryonNo};
 
@@ -191,11 +192,12 @@ void etaCorrelations() {
 				 << endl;
 		}
 
-		//fillEventDataHistogram(hPt, hPartID, trackInfo, N_TRACKS);
 		if(parimp > 3.2) {
-			delete[] etaArr; etaArr = 0;	
+			delete[] etaArr; etaArr = 0;
 			continue; // allow only 0-5% central collisions...  
 		} 
+		N_CENTRAL_EVENTS++;
+		//fillEventDataHistogram(hPt, hPartID, trackInfo, N_TRACKS);
 		etaArr = fillRapidities(hEtaGen, trackInfo, hMultGen, N_TRACKS, N_PROTON_TRACKS);
 		fill1DRapidityDist(hEta1D, hdEta, etaArr, N_PROTON_TRACKS);
 		fill2DRapidityDist(hEta2D, hR2, etaArr, N_PROTON_TRACKS);
@@ -205,7 +207,7 @@ void etaCorrelations() {
 
 	cout << "Normalizing..." << endl;
 	TH1 * histosNormalize[5] = {hEta1D, hEta2D, hEta3D, hR2, hR3};
-	normalizeHistograms(histosNormalize, N_EVENTS, 5);
+	normalizeHistograms(histosNormalize, N_CENTRAL_EVENTS, 5);
 
 	cout << "Calculating rho1^2 & rho1^3 Tensor Products..." << endl;
 	fill2DTensorProduct(hEtaT2D, hEta1D);
@@ -644,8 +646,8 @@ void drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile0,
 				hR2->Draw("colz");
 			canvases[iCanvas]->cd(5);
 				hR2dEtaBase->SetStats(0);
-				hR2dEtaBase->SetMinimum(-1);
-				hR2dEtaBase->SetMaximum(100);
+				hR2dEtaBase->SetMinimum(-0.05);
+				hR2dEtaBase->SetMaximum(0.05);
 				hR2dEtaBase->SetMarkerStyle(20);
 				hR2dEtaBase->SetMarkerSize(1);
 				hR2dEtaBase->SetMarkerColor(4);
