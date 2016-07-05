@@ -141,7 +141,7 @@ void etaCorrelations() {
 
 	const int NBETA	= 40;
 	const float ETAMAX = 1.0;
-	TH1D *hMultGen = new TH1D("hMultGen", "hMultGen", 100, -0.5, 99.5);
+	TH1D *hMultGen = new TH1D("hMultGen", "hMultGen", 200, -0.5, 199.5);
 	TH1D *hEtaGen = new TH1D("hEtaGen", "Generated #eta", NBETA, -ETAMAX, ETAMAX);
 	TH1D *hdEta	= new TH1D("hdEta", "#Delta#eta", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
 	TH1D *hEta1D = new TH1D("hEta1D", "hEta1D", NBETA, -ETAMAX, ETAMAX);
@@ -171,16 +171,17 @@ void etaCorrelations() {
 	TH2D *hR3dEta = new TH2D("hR3dEta", "#LTR_{3}#GT vs (#Delta#eta_{12}, #Delta#eta_{13})", 2 * NBETA - 1, -2. * ETAMAX, 2.* ETAMAX, 2* NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
 	TH2D *hR3dEta_N	= new TH2D("hR3dEta_N", "NBINS vs (#Delta#eta_{12}, #Delta#eta_{13})", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX, 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
 
-	const int N_EVENTS = nentries;
+	const int N_EVENTS = 100000;
 	int N_CENTRAL_EVENTS = 0;
 	TrackInfo trackInfo = {igid, gpx, gpy, gpz, name, mass, charge, 
 	lifetime, eta, rapidity, phi, pTotal, pt, baryonNo};
 
 	for(Long64_t iEvent = 0; iEvent < N_EVENTS; iEvent++) {
+
 		if(iEvent % (N_EVENTS / 10) == 0) { 
 			cout << "processing " << iEvent << " of " << N_EVENTS << endl; 
 		}
-
+               
 		nb = chain->GetEntry(iEvent);
 		int N_TRACKS = mpart;
 	    int N_PROTON_TRACKS = 0;
@@ -203,6 +204,7 @@ void etaCorrelations() {
 		fill2DRapidityDist(hEta2D, hR2, etaArr, N_PROTON_TRACKS);
 		//fill3DRapidityDist(hEta3D, hR3, etaArr, N_PROTON_TRACKS);	
 		delete[] etaArr; etaArr = 0;	
+                
 	}
 
 	cout << "Normalizing..." << endl;
@@ -248,8 +250,8 @@ void etaCorrelations() {
 
 
 int addUrQMDEventsFromPath(TChain *chain) {
-    TString path = TString("../UrQMD/events/");
-	TString	filenames = TString("urqmd_23_0099_*.root");
+    TString path = TString("/nfs/rhi/UrQMD/events_2016/007/");
+	TString	filenames = TString("urqmd_19_*.root");
 	TString input = path + filenames;
 	cout << input.Data() << endl;
 	chain->Add(input.Data());
@@ -646,8 +648,8 @@ void drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile0,
 				hR2->Draw("colz");
 			canvases[iCanvas]->cd(5);
 				hR2dEtaBase->SetStats(0);
-				hR2dEtaBase->SetMinimum(-0.05);
-				hR2dEtaBase->SetMaximum(0.05);
+				hR2dEtaBase->SetMinimum(-0.005);
+				hR2dEtaBase->SetMaximum(0.005);
 				hR2dEtaBase->SetMarkerStyle(20);
 				hR2dEtaBase->SetMarkerSize(1);
 				hR2dEtaBase->SetMarkerColor(4);
