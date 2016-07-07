@@ -73,8 +73,9 @@ void fillR2dEtaHistogram(TH1D*, TH1D*, TH2D*, int);
 void fillR3dEtaHistogram(TH2D*, TH2D*, TH3D*, int);
 void fillR2EtaBaseHistogram(TH1D*, TH1D*);
 void fillR2EtaBaseValDistHistogram(TH1D*, TH1D*);
+double calculateIntegral(TH1D*, float);
 void setStyle();
-void drawR2HistogramsToFile(TCanvas**, int&, TString, TH1D*, TH2D*, TH1D*, TH1D*, TH2D*, TH1D*);
+void drawR2HistogramsToFile(TCanvas**, int&, TString, TH1D*, TH2D*, TH1D*, TH1D*, TH2D*, TH1D*, double);
 void drawR3HistogramsToFile(TCanvas**, int&, TString, TH1D*, TH2D*, TH2D*);
 void executeFilePlots(TCanvas**, int, TString, TString, TString);
 void GetInfo(int, float, float, float, TString&, float&, float&, float&,
@@ -237,10 +238,13 @@ void etaCorrelations() {
 	fillR2EtaBaseHistogram(hR2dEtaBase, hR2dEta);
 	fillR2EtaBaseValDistHistogram(hR2dEtaBaseValDist, hR2dEta);
 
+	cout<<"Calculating Integral..."<<endl;
+	double integral = calculateIntegral(hR2dEtaBase, baseC2);
+
 	cout << "Preparing files..." << endl;
 	setStyle();
 	drawR2HistogramsToFile(canvases, iCanvas, plotFile0, hEtaGen, hEta2D, hMultGen, 
-		hR2dEtaBaseValDist, hR2, hR2dEtaBase);
+		hR2dEtaBaseValDist, hR2, hR2dEtaBase, integral);
 	//drawR3HistogramsToFile(canvases, iCanvas, plotFile, hR2dEtaBase, 
 	//	hR3dEta, hR3dEta_N);
 	executeFilePlots(canvases, iCanvas, plotFileC, plotFile, plotFilePDF);
@@ -251,7 +255,7 @@ void etaCorrelations() {
 
 int addUrQMDEventsFromPath(TChain *chain) {
     TString path = TString("/nfs/rhi/UrQMD/events_2016/007/");
-	TString	filenames = TString("urqmd_19_*.root");
+	TString	filenames = TString("urqmd_19_0005_*.root");
 	TString input = path + filenames;
 	cout << input.Data() << endl;
 	chain->Add(input.Data());
@@ -592,6 +596,15 @@ void fillR2EtaBaseValDistHistogram(TH1D *hR2dEtaBaseValDist, TH1D *hR2dEta) {
 	}
 }
 
+double calculateIntegral(TH1D* hR2dEtaBase, float baseline) {
+	double integral = 0;
+	int numBins = hR2dEtaBase->GetNbinsX();
+	for(int i = 1; i < numBins; i++) {
+		double value = hR2dEtaBase->GetBinContent(i);
+		integral += (value - baseline);
+	}
+	return integral;
+}
 
 
 void setStyle() {
@@ -627,8 +640,11 @@ void setStyle() {
 }
 
 void drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile0, TH1D *hEtaGen, TH2D *hEta2D, 
-	TH1D *hMultGen, TH1D* hR2dEtaBaseValDist, TH2D* hR2, TH1D* hR2dEtaBase) {
+	TH1D *hMultGen, TH1D* hR2dEtaBaseValDist, TH2D* hR2, TH1D* hR2dEtaBase, double integral) {
 	if(PLOT_ON) {
+		TLatex * text = new TLatex();
+		text->SetTextSize(0.05);
+		text->SetNDC();
 		char buf[200];
 		iCanvas++;
 		sprintf(buf, "canvases%d", iCanvas);
@@ -655,6 +671,7 @@ void drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile0,
 				hR2dEtaBase->SetMarkerColor(4);
 				hR2dEtaBase->SetLineColor(4);
 				hR2dEtaBase->Draw("hist");
+				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral));
 			canvases[iCanvas]->cd(6);
 				hR2dEtaBaseValDist->Draw();
 		canvases[iCanvas]->cd(); 
