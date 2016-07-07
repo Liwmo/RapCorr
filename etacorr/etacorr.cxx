@@ -47,14 +47,14 @@ struct TrackInfo {
     float pTotal, pt, baryonNo;
 };
 
-void etaCorrelations();
+void plotRapidityCorrelations();
 int addUrQMDEventsFromPath(TChain*);
 double * getXValsForLogAxis(int, float, float);
 void resetHistograms(TH1**, int);
 void setupOutputFilePaths(TString&, TString&, TString&, TString&);
 void fillEventDataHistogram(TH1D*, TH1D*, TrackInfo&, int);
-float * fillRapidities(TH1D*, TrackInfo&, TH1D*, int, int&); 
-void fill1DRapidityDist(TH1D*, TH1D*, float*, int);
+float * fillRapidities(TrackInfo&, TH1D*, int, int&); 
+void fill1DRapidityDist(TH1D*, float*, int);
 void fill2DRapidityDist(TH2D*, TH2D*, float*, int);
 void fill3DRapidityDist(TH3D*, TH3D*, float*, int);
 void normalizeHistograms(TH1**, int, int);
@@ -78,16 +78,16 @@ void setStyle();
 void drawR2HistogramsToFile(TCanvas**, int&, TString, TH1D*, TH2D*, TH1D*, TH1D*, TH2D*, TH1D*, double);
 void drawR3HistogramsToFile(TCanvas**, int&, TString, TH1D*, TH2D*, TH2D*);
 void executeFilePlots(TCanvas**, int, TString, TString, TString);
-void GetInfo(int, float, float, float, TString&, float&, float&, float&,
+void getInfo(int, float, float, float, TString&, float&, float&, float&,
                 float&, float&, float&, float&, float&, float&);
 
 int main(int argc, char **argv) {
 	gRandom->SetSeed(123456);
-	etaCorrelations();
+	plotRapidityCorrelations();
 	return 0;
 }
 
-void etaCorrelations() {
+void plotRapidityCorrelations() {
 	float mass, charge, lifetime, eta, rapidity, phi, pTotal, pt, baryonNo; 
 	TString name;
 
@@ -142,37 +142,33 @@ void etaCorrelations() {
 
 	const int NBETA	= 40;
 	const float ETAMAX = 1.0;
-	TH1D *hMultGen = new TH1D("hMultGen", "hMultGen", 200, -0.5, 199.5);
-	TH1D *hEtaGen = new TH1D("hEtaGen", "Generated #eta", NBETA, -ETAMAX, ETAMAX);
-	TH1D *hdEta	= new TH1D("hdEta", "#Delta#eta", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
-	TH1D *hEta1D = new TH1D("hEta1D", "hEta1D", NBETA, -ETAMAX, ETAMAX);
-	TH2D *hEta2D = new TH2D("hEta2D", "#eta_{2} vs #eta_{1}", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
-	TH2D *hEtaT2D = new TH2D("hEtaT2D", "hEtaT2D", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
+	TH1D *hMultiplicity = new TH1D("hMultiplicity", "Multiplicity", 200, -0.5, 199.5);
+	TH1D *hRapidity1D = new TH1D("hRapidity1D", "hRapidity1D", NBETA, -ETAMAX, ETAMAX);
+	TH2D *hRapidity2D = new TH2D("hRapidity2D", "#eta_{2} vs #eta_{1}", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
+	TH2D *hTensorProduct2D = new TH2D("hTensorProduct2D", "Tensor Product 2D", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
 	TH2D *hR2 = new TH2D("hR2", "R_{2} vs (#eta_{1},#eta_{2})", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
-	TH2D *hC2 = new TH2D("hC2", "C_{2} vs (#eta_{1},#eta_{2})", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
-	TH1D *hCorr1D = new TH1D("hCorr1D", "hCorr1D", numBins, binXVals);
-	TH2D *hConst2D = new TH2D("hConst2D", "hConst2D", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
-	TH1D *hR2dEta = new TH1D("hR2dEta", "#LTR_{2}#GT vs #eta_{1}-#eta_{2}", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
-	TH1D *hR2dEta_N = new TH1D("hR2dEta_N", "NBINS vs #eta_{1}-#eta_{2}", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
-	TH1D *hR2dEtaBase = new TH1D("hR2dEtaBase", "#LTR_{2}#GT-Baseline vs #eta_{1}-#eta_{2}", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
+	TH2D *hConstant2D = new TH2D("hConstant2D", "hConstant2D", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
+	TH1D *hR2_dRapidity = new TH1D("hR2_dRapidity", "#LTR_{2}#GT vs #eta_{1}-#eta_{2}", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
+	TH1D *hR2_dRapidity_N = new TH1D("hR2_dRapidity_N", "NBINS vs #eta_{1}-#eta_{2}", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
+	TH1D *hR2_dRapidityBaseline = new TH1D("hR2_dRapidityBaseline", "#LTR_{2}#GT-Baseline vs #eta_{1}-#eta_{2}", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
 
 	int freqNumBins	= 500;
 	float freqBinWidth = 0.001; 
-	TH1D *hR2dEtaBaseValDist = new TH1D("hR2dEtaBaseValDist", "Frequency #LTR_{2}#GT-Baseline",
+	TH1D *hR2_dRapidityBaselineValDist = new TH1D("hR2_dRapidityBaselineValDist", "Frequency #LTR_{2}#GT-Baseline",
 			freqNumBins, -freqNumBins * freqBinWidth / 2., freqNumBins * freqBinWidth / 2.);
-	TH1 * histoResets[14] = {hMultGen, hEtaGen, hdEta, hEta1D, hEta2D, hEtaT2D, 
-		hR2, hC2, hCorr1D, hConst2D, hR2dEta, hR2dEta_N, hR2dEtaBase, hR2dEtaBaseValDist};
-	resetHistograms(histoResets, 14);
+	TH1 * histoResets[10] = {hMultiplicity, hRapidity1D, hRapidity2D, hTensorProduct2D, 
+		hR2, hConstant2D, hR2_dRapidity, hR2_dRapidity_N, hR2_dRapidityBaseline, hR2_dRapidityBaselineValDist};
+	resetHistograms(histoResets, 10);
 
-	TH3D *hEta3D = new TH3D("hEta3D", "hEta3D", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
+	TH3D *hRapidity3D = new TH3D("hRapidity3D", "Rapidity 3D", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
 	TH3D *hR3 = new TH3D("hR3", "hR3", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
-	TH3D *hEtaT3D = new TH3D("hEtaT3D", "hEtaT3D", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
+	TH3D *hTensorProduct3D = new TH3D("hTensorProduct3D", "hTensorProduct3D", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
 	TH3D *hC2rho1 = new TH3D("hC2rho1","hC2rho1", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
-	TH3D *hConst3D = new TH3D("hConst3D", "hConst3D", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
-	TH2D *hR3dEta = new TH2D("hR3dEta", "#LTR_{3}#GT vs (#Delta#eta_{12}, #Delta#eta_{13})", 2 * NBETA - 1, -2. * ETAMAX, 2.* ETAMAX, 2* NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
-	TH2D *hR3dEta_N	= new TH2D("hR3dEta_N", "NBINS vs (#Delta#eta_{12}, #Delta#eta_{13})", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX, 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
+	TH3D *hConstant3D = new TH3D("hConstant3D", "hConstant3D", NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX, NBETA, -ETAMAX, ETAMAX);
+	TH2D *hR3_dRapidity = new TH2D("hR3_dRapidity", "#LTR_{3}#GT vs (#Delta#eta_{12}, #Delta#eta_{13})", 2 * NBETA - 1, -2. * ETAMAX, 2.* ETAMAX, 2* NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
+	TH2D *hR3_dRapidity_N	= new TH2D("hR3_dRapidity_N", "NBINS vs (#Delta#eta_{12}, #Delta#eta_{13})", 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX, 2 * NBETA - 1, -2. * ETAMAX, 2. * ETAMAX);
 
-	const int N_EVENTS = 100000;
+	const int N_EVENTS = 500000;
 	int N_CENTRAL_EVENTS = 0;
 	TrackInfo trackInfo = {igid, gpx, gpy, gpz, name, mass, charge, 
 	lifetime, eta, rapidity, phi, pTotal, pt, baryonNo};
@@ -200,53 +196,53 @@ void etaCorrelations() {
 		} 
 		N_CENTRAL_EVENTS++;
 		//fillEventDataHistogram(hPt, hPartID, trackInfo, N_TRACKS);
-		etaArr = fillRapidities(hEtaGen, trackInfo, hMultGen, N_TRACKS, N_PROTON_TRACKS);
-		fill1DRapidityDist(hEta1D, hdEta, etaArr, N_PROTON_TRACKS);
-		fill2DRapidityDist(hEta2D, hR2, etaArr, N_PROTON_TRACKS);
-		//fill3DRapidityDist(hEta3D, hR3, etaArr, N_PROTON_TRACKS);	
+		etaArr = fillRapidities(trackInfo, hMultiplicity, N_TRACKS, N_PROTON_TRACKS);
+		fill1DRapidityDist(hRapidity1D, etaArr, N_PROTON_TRACKS);
+		fill2DRapidityDist(hRapidity2D, hR2, etaArr, N_PROTON_TRACKS);
+		//fill3DRapidityDist(hRapidity3D, hR3, etaArr, N_PROTON_TRACKS);	
 		delete[] etaArr; etaArr = 0;	
                 
 	}
 
 	cout << "Normalizing..." << endl;
-	TH1 * histosNormalize[5] = {hEta1D, hEta2D, hEta3D, hR2, hR3};
+	TH1 * histosNormalize[5] = {hRapidity1D, hRapidity2D, hRapidity3D, hR2, hR3};
 	normalizeHistograms(histosNormalize, N_CENTRAL_EVENTS, 5);
 
 	cout << "Calculating rho1^2 & rho1^3 Tensor Products..." << endl;
-	fill2DTensorProduct(hEtaT2D, hEta1D);
-	//fill3DTensorProduct(hEtaT3D, hEta1D);
-	fillConstant2DHistogram(hConst2D, -1.0, hEta1D);
-	//fillConstant3DHistogram(hConst3D, +2.0, hEta1D);
+	fill2DTensorProduct(hTensorProduct2D, hRapidity1D);
+	//fill3DTensorProduct(hTensorProduct3D, hRapidity1D);
+	fillConstant2DHistogram(hConstant2D, -1.0, hRapidity1D);
+	//fillConstant3DHistogram(hConstant3D, +2.0, hRapidity1D);
 
 	cout << "Calculating C2rho1..." << endl;
-	fillC2rho1Histogram(hC2rho1, hEta2D, hEta1D);
+	fillC2rho1Histogram(hC2rho1, hRapidity2D, hRapidity1D);
 	
 	cout<<"Calculating R2 and R3..."<<endl;
-	calculateR2Histogram(hR2, hEtaT2D, hConst2D);
-	//calculateR3Histogram(hR3, hEtaT3D, hC2rho1, hConst3D);
+	calculateR2Histogram(hR2, hTensorProduct2D, hConstant2D);
+	//calculateR3Histogram(hR3, hTensorProduct3D, hC2rho1, hConstant3D);
 		
 	cout<<"Calculating Baselines..."<<endl;
-	float baseC2 = getC2Baseline(hMultGen);
-	//float baseC3 = getC3Baseline(hMultGen);
+	float baseC2 = getC2Baseline(hMultiplicity);
+	//float baseC3 = getC3Baseline(hMultiplicity);
 	applyC2BaselineAdjustment(hR2, baseC2, NBETA);
 	//applyC3BaselineAdjustment(hR3, baseC3, NBETA);
 
 	cout<<"Averaging in dEta slices..."<<endl;
-	fillR2dEtaHistogram(hR2dEta, hR2dEta_N, hR2, NBETA);
-	//fillR3dEtaHistogram(hR3dEta, hR3dEta_N, hR3, NBETA);
+	fillR2dEtaHistogram(hR2_dRapidity, hR2_dRapidity_N, hR2, NBETA);
+	//fillR3dEtaHistogram(hR3_dRapidity, hR3_dRapidity_N, hR3, NBETA);
 
-	fillR2EtaBaseHistogram(hR2dEtaBase, hR2dEta);
-	fillR2EtaBaseValDistHistogram(hR2dEtaBaseValDist, hR2dEta);
+	fillR2EtaBaseHistogram(hR2_dRapidityBaseline, hR2_dRapidity);
+	fillR2EtaBaseValDistHistogram(hR2_dRapidityBaselineValDist, hR2_dRapidity);
 
 	cout<<"Calculating Integral..."<<endl;
-	double integral = calculateIntegral(hR2dEtaBase, baseC2);
+	double integral = calculateIntegral(hR2_dRapidityBaseline, baseC2);
 
 	cout << "Preparing files..." << endl;
 	setStyle();
-	drawR2HistogramsToFile(canvases, iCanvas, plotFile0, hEtaGen, hEta2D, hMultGen, 
-		hR2dEtaBaseValDist, hR2, hR2dEtaBase, integral);
-	//drawR3HistogramsToFile(canvases, iCanvas, plotFile, hR2dEtaBase, 
-	//	hR3dEta, hR3dEta_N);
+	drawR2HistogramsToFile(canvases, iCanvas, plotFile0, hRapidity1D, hRapidity2D, hMultiplicity, 
+		hR2_dRapidityBaselineValDist, hR2, hR2_dRapidityBaseline, integral);
+	//drawR3HistogramsToFile(canvases, iCanvas, plotFile, hR2_dRapidityBaseline, 
+	//	hR3_dRapidity, hR3_dRapidity_N);
 	executeFilePlots(canvases, iCanvas, plotFileC, plotFile, plotFilePDF);
 
 	delete[] binXVals;
@@ -304,7 +300,7 @@ void setupOutputFilePaths(TString &plotFile0, TString &plotFile,
 void fillEventDataHistogram(TH1D *hPt, TH1D *hPartID, TrackInfo &info, int N_TRACKS) {
 	for(int iTrack = 0; iTrack < N_TRACKS; iTrack++) {
 		
-		GetInfo(info.geantID[iTrack], info.px[iTrack], info.py[iTrack], info.pz[iTrack], 
+		getInfo(info.geantID[iTrack], info.px[iTrack], info.py[iTrack], info.pz[iTrack], 
 		info.name, info.mass, info.charge, info.lifetime, info.eta, info.rapidity, info.phi, info.pTotal, info.pt, info.baryonNo);
 		
 		hPt->Fill(std::sqrt(info.px[iTrack] * info.px[iTrack] + info.py[iTrack] * info.py[iTrack]));
@@ -313,54 +309,47 @@ void fillEventDataHistogram(TH1D *hPt, TH1D *hPartID, TrackInfo &info, int N_TRA
 }
 
 
-float * fillRapidities(TH1D *hEtaGen, TrackInfo &info, TH1D* hMultGen, int N_TRACKS, int &N_PROTON_TRACKS) {
+float * fillRapidities(TrackInfo &info, TH1D* hMultiplicity, int N_TRACKS, int &N_PROTON_TRACKS) {
 	float *etaArr = new float[N_TRACKS];
 	int protonCount = 0; 
 	const int PROTON = 14;
 
 	for(int iTrack = 0; iTrack < N_TRACKS; iTrack++) {
-		GetInfo(info.geantID[iTrack], info.px[iTrack], info.py[iTrack], info.pz[iTrack], 
+		getInfo(info.geantID[iTrack], info.px[iTrack], info.py[iTrack], info.pz[iTrack], 
 			info.name, info.mass, info.charge, info.lifetime, info.eta, info.rapidity, info.phi, info.pTotal, info.pt, info.baryonNo);
 		if(info.geantID[iTrack] == PROTON && abs(info.rapidity) <= 1.0) { 
-			hEtaGen->Fill(info.rapidity);			
 			etaArr[protonCount] = info.rapidity;
 			protonCount++;
 		}
 	}
-	hMultGen->Fill(protonCount);	
+	hMultiplicity->Fill(protonCount);	
 	N_PROTON_TRACKS = protonCount;
 	return etaArr;
 }
 
-void fill1DRapidityDist(TH1D *hEta1D, TH1D *hdEta, float * etaArr, int N_TRACKS) {
+void fill1DRapidityDist(TH1D *hRapidity1D, float * etaArr, int N_TRACKS) {
 	for(int i = 0; i < N_TRACKS; i++) {
-		hEta1D->Fill(etaArr[i]);
-		
-		for(int j = 0; j < N_TRACKS; j++) {
-			if(i != j) {
-				hdEta->Fill(etaArr[j] - etaArr[i]);
-			}
-		}
+		hRapidity1D->Fill(etaArr[i]);
 	}
 }
 
-void fill2DRapidityDist(TH2D *hEta2D, TH2D *hR2, float * etaArr, int N_TRACKS) {
+void fill2DRapidityDist(TH2D *hRapidity2D, TH2D *hR2, float * etaArr, int N_TRACKS) {
 	for(int i = 0; i < N_TRACKS; i++) {			
 		for(int j = 0; j < N_TRACKS; j++) {
 			if(i != j) {
-				hEta2D->Fill(etaArr[i], etaArr[j]);
+				hRapidity2D->Fill(etaArr[i], etaArr[j]);
 				hR2->Fill(etaArr[i], etaArr[j]);
 			}
 		}
 	}
 }
 
-void fill3DRapidityDist(TH3D *hEta3D, TH3D *hR3, float * etaArr, int N_TRACKS) {
+void fill3DRapidityDist(TH3D *hRapidity3D, TH3D *hR3, float * etaArr, int N_TRACKS) {
 	for(int i = 0; i < N_TRACKS; i++) {
 		for(int j = 0; j < N_TRACKS; j++) {
 			for (int k = 0; k < N_TRACKS; k++) {
 				if (i != j && i != k && j != k) {
-					hEta3D->Fill(etaArr[i], etaArr[j], etaArr[k]);
+					hRapidity3D->Fill(etaArr[i], etaArr[j], etaArr[k]);
 					hR3->Fill(etaArr[i], etaArr[j], etaArr[k]);
 				}
 			}
@@ -376,57 +365,57 @@ void normalizeHistograms(TH1 **histos, int normConst, int size) {
 	}
 }
 
-void fill2DTensorProduct(TH2D *hEtaT2D, TH1D *hEta1D) {
-	int nbin = hEta1D->GetNbinsX();
+void fill2DTensorProduct(TH2D *hTensorProduct2D, TH1D *hRapidity1D) {
+	int nbin = hRapidity1D->GetNbinsX();
 	for(int ibin = 1; ibin <= nbin; ibin++) {
-		float valx1	= hEta1D->GetBinCenter(ibin);
-		float valn1	= hEta1D->GetBinContent(ibin);
+		float valx1	= hRapidity1D->GetBinCenter(ibin);
+		float valn1	= hRapidity1D->GetBinContent(ibin);
 		for(int jbin = 1; jbin <= nbin; jbin++) {
-			float valx2	= hEta1D->GetBinCenter(jbin);
-			float valn2	= hEta1D->GetBinContent(jbin);
-			hEtaT2D->Fill(valx1, valx2, valn1 * valn2);
+			float valx2	= hRapidity1D->GetBinCenter(jbin);
+			float valn2	= hRapidity1D->GetBinContent(jbin);
+			hTensorProduct2D->Fill(valx1, valx2, valn1 * valn2);
 		}
 	}
 }
 
-void fill3DTensorProduct(TH3D *hEtaT3D, TH1D *hEta1D) {
-	int nbin = hEta1D->GetNbinsX();
+void fill3DTensorProduct(TH3D *hTensorProduct3D, TH1D *hRapidity1D) {
+	int nbin = hRapidity1D->GetNbinsX();
 	for(int ibin = 1; ibin <= nbin; ibin++) {
-		float valx1	= hEta1D->GetBinCenter(ibin);
-		float valn1	= hEta1D->GetBinContent(ibin);
+		float valx1	= hRapidity1D->GetBinCenter(ibin);
+		float valn1	= hRapidity1D->GetBinContent(ibin);
 		for(int jbin = 1; jbin <= nbin; jbin++) {
-			float valx2	= hEta1D->GetBinCenter(jbin);
-			float valn2	= hEta1D->GetBinContent(jbin);
+			float valx2	= hRapidity1D->GetBinCenter(jbin);
+			float valn2	= hRapidity1D->GetBinContent(jbin);
 			for(int kbin = 1; kbin <= nbin; kbin++) {
-				float valx3	= hEta1D->GetBinCenter(kbin);
-				float valn3	= hEta1D->GetBinContent(kbin);
-				hEtaT3D->Fill(valx1, valx2, valx3, valn1 * valn2 * valn3);
+				float valx3	= hRapidity1D->GetBinCenter(kbin);
+				float valn3	= hRapidity1D->GetBinContent(kbin);
+				hTensorProduct3D->Fill(valx1, valx2, valx3, valn1 * valn2 * valn3);
 			}
 		}
 	}
 }
 
 
-void fillConstant2DHistogram(TH2D *hConst2D, float val, TH1D *hEta1D) {
-	int nbin = hEta1D->GetNbinsX();
+void fillConstant2DHistogram(TH2D *hConstant2D, float val, TH1D *hRapidity1D) {
+	int nbin = hRapidity1D->GetNbinsX();
 	for(int ibin = 1; ibin <= nbin; ibin++) {
-		float valx1	= hEta1D->GetBinCenter(ibin);
+		float valx1	= hRapidity1D->GetBinCenter(ibin);
 		for(int jbin = 1; jbin <= nbin; jbin++) {
-			float valx2	= hEta1D->GetBinCenter(jbin);
-			hConst2D->Fill(valx1, valx2, val);
+			float valx2	= hRapidity1D->GetBinCenter(jbin);
+			hConstant2D->Fill(valx1, valx2, val);
 		}
 	}
 }
 
-void fillConstant3DHistogram(TH3D* hConst3D, float val, TH1D *hEta1D) {
-	int nbin = hEta1D->GetNbinsX();
+void fillConstant3DHistogram(TH3D* hConstant3D, float val, TH1D *hRapidity1D) {
+	int nbin = hRapidity1D->GetNbinsX();
 	for(int ibin = 1; ibin <= nbin; ibin++) {
-		float valx1	= hEta1D->GetBinCenter(ibin);
+		float valx1	= hRapidity1D->GetBinCenter(ibin);
 		for(int jbin = 1; jbin <= nbin; jbin++) {
-			float valx2 = hEta1D->GetBinCenter(jbin);
+			float valx2 = hRapidity1D->GetBinCenter(jbin);
 			for(int kbin = 1; kbin <= nbin; kbin++) {
-				float valx3	= hEta1D->GetBinCenter(kbin);
-				hConst3D->Fill(valx1, valx2, valx3, val);
+				float valx3	= hRapidity1D->GetBinCenter(kbin);
+				hConstant3D->Fill(valx1, valx2, valx3, val);
 			}
 		}
 	}
@@ -434,18 +423,18 @@ void fillConstant3DHistogram(TH3D* hConst3D, float val, TH1D *hEta1D) {
 
 
 
-void fillC2rho1Histogram(TH3D *hC2rho1, TH2D *hEta2D, TH1D *hEta1D) {
-	int nbin = hEta1D->GetNbinsX();
+void fillC2rho1Histogram(TH3D *hC2rho1, TH2D *hRapidity2D, TH1D *hRapidity1D) {
+	int nbin = hRapidity1D->GetNbinsX();
 	float valxi, valxj, valxk, valnij, valnk;
 	for(int ibin = 1; ibin <= nbin; ibin++) {
 		for(int jbin = 1; jbin <= nbin; jbin++) {
-			valxi = hEta2D->GetXaxis()->GetBinCenter(ibin);
-			valxj = hEta2D->GetYaxis()->GetBinCenter(jbin);
-			valnij = hEta2D->GetBinContent(ibin, jbin);
+			valxi = hRapidity2D->GetXaxis()->GetBinCenter(ibin);
+			valxj = hRapidity2D->GetYaxis()->GetBinCenter(jbin);
+			valnij = hRapidity2D->GetBinContent(ibin, jbin);
 
 			for(int kbin = 1; kbin <= nbin; kbin++) {
-				valxk = hEta1D->GetBinCenter(kbin);
-				valnk = hEta1D->GetBinContent(kbin);
+				valxk = hRapidity1D->GetBinCenter(kbin);
+				valnk = hRapidity1D->GetBinContent(kbin);
 				hC2rho1->Fill(valxi, valxj, valxk, valnij * valnk);
 			}
 		}
@@ -454,33 +443,33 @@ void fillC2rho1Histogram(TH3D *hC2rho1, TH2D *hEta2D, TH1D *hEta1D) {
 
 
 
-void calculateR2Histogram(TH2D *hR2, TH2D *hEtaT2D, TH2D *hConst2D) {
-	hR2->Divide(hEtaT2D);
-	hR2->Add(hConst2D);
+void calculateR2Histogram(TH2D *hR2, TH2D *hTensorProduct2D, TH2D *hConstant2D) {
+	hR2->Divide(hTensorProduct2D);
+	hR2->Add(hConstant2D);
 }
 
-void calculateR3Histogram(TH3D *hR3, TH3D *hEtaT3D, TH3D *hC2rho1, TH3D *hConst3D) {
-	hR3->Divide(hEtaT3D);
-	hC2rho1->Divide(hEtaT3D);
+void calculateR3Histogram(TH3D *hR3, TH3D *hTensorProduct3D, TH3D *hC2rho1, TH3D *hConstant3D) {
+	hR3->Divide(hTensorProduct3D);
+	hC2rho1->Divide(hTensorProduct3D);
 	hC2rho1->Scale(3.0);
 	hR3->Add(hC2rho1, -1.0);
-	hR3->Add(hConst3D);
+	hR3->Add(hConstant3D);
 }
 
-void fillR2dEtaHistogram(TH1D *hR2dEta, TH1D *hR2dEta_N, TH2D *hR2, int NBETA) {
+void fillR2dEtaHistogram(TH1D *hR2_dRapidity, TH1D *hR2_dRapidity_N, TH2D *hR2, int NBETA) {
 	for(int ibx = 1; ibx <= NBETA; ibx++) {								
 		for(int iby = 1; iby <= NBETA; iby++) {						
 			float dEtaXY;									
 			dEtaXY = hR2->GetXaxis()->GetBinCenter(ibx) 		
 			       - hR2->GetYaxis()->GetBinCenter(iby);
-			hR2dEta->Fill(dEtaXY, hR2->GetBinContent(ibx, iby));
-			hR2dEta_N->Fill(dEtaXY, 1.0);
+			hR2_dRapidity->Fill(dEtaXY, hR2->GetBinContent(ibx, iby));
+			hR2_dRapidity_N->Fill(dEtaXY, 1.0);
 		}	
 	} 
-	hR2dEta->Divide(hR2dEta_N);
+	hR2_dRapidity->Divide(hR2_dRapidity_N);
 }
 
-void fillR3dEtaHistogram(TH2D *hR3dEta, TH2D *hR3dEta_N, TH3D *hR3, int NBETA) {
+void fillR3dEtaHistogram(TH2D *hR3_dRapidity, TH2D *hR3_dRapidity_N, TH3D *hR3, int NBETA) {
 	for(int ibx = 1; ibx <= NBETA; ibx++) {						
 		for(int iby = 1; iby <= NBETA; iby++) {						
 			for(int ibz = 1; ibz <= NBETA; ibz++) {					
@@ -489,12 +478,12 @@ void fillR3dEtaHistogram(TH2D *hR3dEta, TH2D *hR3dEta_N, TH3D *hR3, int NBETA) {
 			            - hR3->GetYaxis()->GetBinCenter(iby);
 				dEtaXZ	= hR3->GetXaxis()->GetBinCenter(ibx) 		
 			        	- hR3->GetZaxis()->GetBinCenter(ibz);
-			    hR3dEta->Fill(dEtaXY, dEtaXZ, hR3->GetBinContent(ibx, iby, ibz));
-			    hR3dEta_N->Fill(dEtaXY, dEtaXZ, 1.0);
+			    hR3_dRapidity->Fill(dEtaXY, dEtaXZ, hR3->GetBinContent(ibx, iby, ibz));
+			    hR3_dRapidity_N->Fill(dEtaXY, dEtaXZ, 1.0);
 			}
 		}	
 	}
-	hR3dEta->Divide(hR3dEta_N);
+	hR3_dRapidity->Divide(hR3_dRapidity_N);
 }
 
 
@@ -578,29 +567,29 @@ void applyC3BaselineAdjustment(TH3D *hR3, float baseC3, int NBETA) {
 }
 
 
-void fillR2EtaBaseHistogram(TH1D *hR2dEtaBase, TH1D *hR2dEta) { 
-	for(int ibin = 1; ibin <= hR2dEta->GetNbinsX(); ibin++) {
-		float val = hR2dEta->GetBinContent(ibin);
-		float valErr = hR2dEta->GetBinError(ibin);		// INCORRECT ERRORS VALS
-		hR2dEtaBase->SetBinContent(ibin, val);			// straight copy now...
-		hR2dEtaBase->SetBinError(ibin, valErr);			// INCORRECT ERRORS VALS.
+void fillR2EtaBaseHistogram(TH1D *hR2_dRapidityBaseline, TH1D *hR2_dRapidity) { 
+	for(int ibin = 1; ibin <= hR2_dRapidity->GetNbinsX(); ibin++) {
+		float val = hR2_dRapidity->GetBinContent(ibin);
+		float valErr = hR2_dRapidity->GetBinError(ibin);		// INCORRECT ERRORS VALS
+		hR2_dRapidityBaseline->SetBinContent(ibin, val);			// straight copy now...
+		hR2_dRapidityBaseline->SetBinError(ibin, valErr);			// INCORRECT ERRORS VALS.
 	}
 }
 
-void fillR2EtaBaseValDistHistogram(TH1D *hR2dEtaBaseValDist, TH1D *hR2dEta) {
+void fillR2EtaBaseValDistHistogram(TH1D *hR2_dRapidityBaselineValDist, TH1D *hR2_dRapidity) {
 	int count = 0;
-	for(int ibin = 1; ibin <= hR2dEta->GetNbinsX(); ibin++) {
-		float dEta = hR2dEta->GetBinCenter(ibin);
-		float val = hR2dEta->GetBinContent(ibin);
-		hR2dEtaBaseValDist->Fill(val);
+	for(int ibin = 1; ibin <= hR2_dRapidity->GetNbinsX(); ibin++) {
+		float dEta = hR2_dRapidity->GetBinCenter(ibin);
+		float val = hR2_dRapidity->GetBinContent(ibin);
+		hR2_dRapidityBaselineValDist->Fill(val);
 	}
 }
 
-double calculateIntegral(TH1D* hR2dEtaBase, float baseline) {
+double calculateIntegral(TH1D* hR2_dRapidityBaseline, float baseline) {
 	double integral = 0;
-	int numBins = hR2dEtaBase->GetNbinsX();
+	int numBins = hR2_dRapidityBaseline->GetNbinsX();
 	for(int i = 1; i < numBins; i++) {
-		double value = hR2dEtaBase->GetBinContent(i);
+		double value = hR2_dRapidityBaseline->GetBinContent(i);
 		integral += (value - baseline);
 	}
 	return integral;
@@ -639,8 +628,8 @@ void setStyle() {
 	gStyle->SetHatchesLineWidth(2);
 }
 
-void drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile0, TH1D *hEtaGen, TH2D *hEta2D, 
-	TH1D *hMultGen, TH1D* hR2dEtaBaseValDist, TH2D* hR2, TH1D* hR2dEtaBase, double integral) {
+void drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile0, TH1D *hRapidity1D, TH2D *hRapidity2D, 
+	TH1D *hMultiplicity, TH1D* hR2_dRapidityBaselineValDist, TH2D* hR2, TH1D* hR2_dRapidityBaseline, double integral) {
 	if(PLOT_ON) {
 		TLatex * text = new TLatex();
 		text->SetTextSize(0.05);
@@ -652,28 +641,28 @@ void drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile0,
 		canvases[iCanvas]->cd(); 
 		canvases[iCanvas]->Divide(3,2,0.0001,0.0001);
 			canvases[iCanvas]->cd(1);
-				hMultGen->Draw();
+				hMultiplicity->Draw();
 			canvases[iCanvas]->cd(2);
-				hEtaGen->SetMinimum(0.5);
-				hEtaGen->Draw();
+				hRapidity1D->SetMinimum(0.5);
+				hRapidity1D->Draw();
 			canvases[iCanvas]->cd(3);
-				hEta2D->SetStats(0);
-				hEta2D->Draw("colz");
+				hRapidity2D->SetStats(0);
+				hRapidity2D->Draw("colz");
 			canvases[iCanvas]->cd(4);
 				hR2->SetStats(0);
 				hR2->Draw("colz");
 			canvases[iCanvas]->cd(5);
-				hR2dEtaBase->SetStats(0);
-				hR2dEtaBase->SetMinimum(-0.005);
-				hR2dEtaBase->SetMaximum(0.005);
-				hR2dEtaBase->SetMarkerStyle(20);
-				hR2dEtaBase->SetMarkerSize(1);
-				hR2dEtaBase->SetMarkerColor(4);
-				hR2dEtaBase->SetLineColor(4);
-				hR2dEtaBase->Draw("hist");
+				hR2_dRapidityBaseline->SetStats(0);
+				hR2_dRapidityBaseline->SetMinimum(-0.005);
+				hR2_dRapidityBaseline->SetMaximum(0.005);
+				hR2_dRapidityBaseline->SetMarkerStyle(20);
+				hR2_dRapidityBaseline->SetMarkerSize(1);
+				hR2_dRapidityBaseline->SetMarkerColor(4);
+				hR2_dRapidityBaseline->SetLineColor(4);
+				hR2_dRapidityBaseline->Draw("hist");
 				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral));
 			canvases[iCanvas]->cd(6);
-				hR2dEtaBaseValDist->Draw();
+				hR2_dRapidityBaselineValDist->Draw();
 		canvases[iCanvas]->cd(); 
 		canvases[iCanvas]->Update();
 		canvases[iCanvas]->Print(plotFile0.Data());
@@ -681,7 +670,7 @@ void drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile0,
 }
 
 void drawR3HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile,
-	TH1D *hR2dEtaBase, TH2D *hR3dEta, TH2D *hR3dEta_N) {
+	TH1D *hR2_dRapidityBaseline, TH2D *hR3_dRapidity, TH2D *hR3_dRapidity_N) {
 	if(PLOT_ON) {
 		char buf[200];
 		iCanvas++;	
@@ -693,11 +682,11 @@ void drawR3HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile,
 		canvases[iCanvas]->cd(); 
 		canvases[iCanvas]->Divide(3, 2, 0.0001, 0.0001);
 			canvases[iCanvas]->cd(1);
-				hR2dEtaBase->Draw("HIST");
+				hR2_dRapidityBaseline->Draw("HIST");
 			canvases[iCanvas]->cd(2);
-				hR3dEta->Draw("COLZ1");
+				hR3_dRapidity->Draw("COLZ1");
 			canvases[iCanvas]->cd(3);
-				hR3dEta_N->Draw("COLZ1");
+				hR3_dRapidity_N->Draw("COLZ1");
 			canvases[iCanvas]->cd(4);
 			canvases[iCanvas]->cd(5);
 			canvases[iCanvas]->cd(6);
@@ -719,7 +708,7 @@ void executeFilePlots(TCanvas **canvases, int iCanvas, TString plotFileC,
 	}
 }
 
-void GetInfo(int geantID, float px, float py, float pz, 
+void getInfo(int geantID, float px, float py, float pz, 
         TString &name, float &mass, float &charge, float &lifetime,
         float &eta, float &rapidity, float &phi, 
         float &pTotal, float &pt, float &baryonNo) {
