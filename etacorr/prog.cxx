@@ -1,497 +1,175 @@
 #include "rapcorr.h"
 
-RapCorr::RapCorr() {
-	nEvents	= 0;
-	numBins = 18;
-	yLower = -0.72;
-	yUpper = 0.72;
-	binWidth = (yUpper - yLower) / numBins;
+void plotRapidityCorrelations();
+int addUrQMDEventsFromPath(TChain*);
+double * fillRapidities(TrackInfo&, int, int&); 
+void getInfo(int, float, float, float, TString&, float&, float&, float&,
+		    	float&, float&, float&, float&, float&, float&);
+
+int main(int argc, char **argv) {
+	gRandom->SetSeed(123456);
+	plotRapidityCorrelations();
+	return 0;
+}
+
+void plotRapidityCorrelations() {
+
+	float mass, charge, lifetime, eta, rapidity, phi, pTotal, pt, baryonNo; 
+	TString name;
+
+	Int_t ievt;
+	Float_t parimp;
+	Float_t gecm;
+	Float_t evinfo[5];
+	Int_t mpart;
+	Int_t igid[11000];   
+	Float_t gpx[11000];    
+	Float_t gpy[11000];    
+	Float_t gpz[11000];    
 	
-	numBinsDY = 2 * numBins - 1;
-	yLowerDY = yLower - yUpper + binWidth / 2.;
-	yUpperDY = yUpper - yLower - binWidth / 2.;
+	TBranch *b_ievt;     
+	TBranch *b_parimp;   
+	TBranch *b_gecm;     
+	TBranch *b_evinfo;   
+	TBranch *b_mpart;    
+	TBranch *b_igid;     
+	TBranch *b_gpx;      
+	TBranch *b_gpy;      
+	TBranch *b_gpz;      
 
-	maxMult	= 200;
-	hMultiplicity = new TH1D("hmult", "hmult", maxMult, -0.5, ((float)maxMult)-0.5);
+	TChain *chain = new TChain("h1", "events chain");
+	int nb, nentries = addUrQMDEventsFromPath(chain);
+
+	chain->SetMakeClass(1);
+	chain->SetBranchAddress("ievt", &ievt, &b_ievt);
+	chain->SetBranchAddress("parimp", &parimp, &b_parimp);
+	chain->SetBranchAddress("gecm", &gecm, &b_gecm);
+	chain->SetBranchAddress("evinfo", evinfo, &b_evinfo);
+	chain->SetBranchAddress("mpart", &mpart, &b_mpart);
+	chain->SetBranchAddress("igid", igid, &b_igid);
+	chain->SetBranchAddress("gpx", gpx, &b_gpx);
+	chain->SetBranchAddress("gpy", gpy, &b_gpy);
+	chain->SetBranchAddress("gpz", gpz, &b_gpz);
+
+	RapCorr *rapCorr = new RapCorr();
+	rapCorr->setRunR2(true);
+	rapCorr->setRunR3(false);
+	rapCorr->book();
 	
-	runR2 = false;
-	runR3 = false; 
-}
+	const int N_EVENTS = 100000;
+	TrackInfo trackInfo = {igid, gpx, gpy, gpz, name, mass, charge, 
+	lifetime, eta, rapidity, phi, pTotal, pt, baryonNo};
 
-RapCorr::~RapCorr() {
-	delete hMultiplicity; hMultiplicity = 0;
-	delete hRapidity1D; hRapidity1D = 0;
-	delete hRapidity2D; hRapidity2D = 0;
-	delete hTensorProduct2D; hTensorProduct2D = 0;
-	delete hR2; hR2 = 0;
-	delete hConstant2D; hConstant2D = 0;
-	delete hR2_dRapidity; hR2_dRapidity = 0;
-	delete hR2_dRapidity_N; hR2_dRapidity_N = 0;
-	delete hR2_dRapidityBaseline; hR2_dRapidityBaseline = 0;
+	for(Long64_t iEvent = 0; iEvent < N_EVENTS; iEvent++) {
 
-	TH3D *hRapidity3D;
-	TH3D *hR3;
-	TH3D *hTensorProduct3D;
-	TH3D *hC2rho1;
-	TH3D *hConstant3D;
-	TH2D *hR3_dRapidity;
-	TH2D *hR3_dRapidity_N;
-}
+		if(iEvent % (N_EVENTS / 10) == 0) { 
+			cout << "processing " << iEvent << " of " << N_EVENTS << endl; 
+		}
+               
+		nb = chain->GetEntry(iEvent);
+		int N_TRACKS = mpart;
+	    int N_PROTON_TRACKS = 0;
+	    double *rapidityArr = new double[N_TRACKS];
+	    memset(rapidityArr, 0, N_TRACKS*sizeof(double)); 
 
-void RapCorr::book() {
-	TH1::AddDirectory(kFALSE);
+		if(parimp > 3.2) {
+			delete[] rapidityArr; rapidityArr = 0;
+			continue; // allow only 0-5% central collisions...  
+		} 
 
-	TH1D *hRapidity1D = new TH1D("hRapidity1D", "Rapidity 1D", numBins, -yLower, yUpper);
-	TH2D *hRapidity2D = new TH2D("hRapidity2D", "#y_{2} vs #y_{1}", numBins, -yLower, yUpper, numBins, yLower, yUpper);
-	TH2D *hTensorProduct2D = new TH2D("hTensorProduct2D", "Tensor Product 2D", numBins, yLower, yUpper, numBins, yLower, yUpper);
-	TH2D *hR2 = new TH2D("hR2", "R_{2} vs (#y_{1},#y_{2})", numBins, yLower, yUpper, numBins, yLower, yUpper);
-	TH2D *hConstant2D = new TH2D("hConstant2D", "hConstant2D", numBins, yLower, yUpper, numBins, yLower, yUpper);
-	TH1D *hR2_dRapidity = new TH1D("hR2_dRapidity", "#LTR_{2}#GT vs #y_{1}-#y_{2}", numBinsDY, yLowerDY, yUpperDY);
-	TH1D *hR2_dRapidity_N = new TH1D("hR2_dRapidity_N", "NBINS vs #y_{1}-#y_{2}", numBinsDY, yLowerDY, yUpperDY);
-	TH1D *hR2_dRapidityBaseline = new TH1D("hR2_dRapidityBaseline", "#LTR_{2}#GT-Baseline vs #y_{1}-#y_{2}", numBinsDY, yLowerDY, yUpperDY);
-
-	TH3D *hRapidity3D = new TH3D("hRapidity3D", "Rapidity 3D", numBins, yLower, yUpper, numBins, yLower, yUpper, numBins, yLower, yUpper);
-	TH3D *hR3 = new TH3D("hR3", "hR3", numBins, yLower, yUpper, numBins, yLower, yUpper, numBins, yLower, yUpper);
-	TH3D *hTensorProduct3D = new TH3D("hTensorProduct3D", "Tensor Product 3D", numBins, yLower, yUpper, numBins, yLower, yUpper, numBins, yLower, yUpper);
-	TH3D *hC2rho1 = new TH3D("hC2rho1","hC2rho1", numBins, yLower, yUpper, numBins, yLower, yUpper, numBins, yLower, yUpper);
-	TH3D *hConstant3D = new TH3D("hConstant3D", "Constant 3D", numBins, yLower, yUpper, numBins, yLower, yUpper, numBins, yLower, yUpper);
-	TH2D *hR3_dRapidity = new TH2D("hR3_dRapidity", "#LTR_{3}#GT vs (#Delta#y_{12}, #Delta#y_{13})", numBinsDY, yLowerDY, yUpperDY, numBinsDY, yLowerDY, yUpperDY);
-	TH2D *hR3_dRapidity_N	= new TH2D("hR3_dRapidity_N", "NBINS vs (#Delta#y_{12}, #Delta#y_{13})", numBinsDY, yLowerDY, yUpperDY, numBinsDY, yLowerDY, yUpperDY);
-}
-
-void RapCorr::increment(double *rapidities, int nTracks) {
-	nEvents++;
-	if(nTracks >= maxMult) {
-		cout << "Warning: Increase maxMult! Mult:" << nTracks << ">" << maxMult << endl; 
+		rapidityArr = fillRapidities(trackInfo, N_TRACKS, N_PROTON_TRACKS);
+		rapCorr->increment(rapidityArr, N_PROTON_TRACKS);
+		delete[] rapidityArr; rapidityArr = 0;	
 	}
-	hMultiplicity->Fill(nTracks);
-	if(runR2) {
-		fill1DRapidityDist(rapidities, nTracks);
-		fill2DRapidityDist(rapidities, nTracks);	
-	}
-	if(runR3) {
-		fill3DRapidityDist(rapidities, nTracks);		
-	}
+	rapCorr->calculate();
+	delete rapCorr; rapCorr = 0;
 }
 
-void RapCorr::calculate() {
-	int iCanvas = -1;
-	TCanvas *canvases[100];
-	TString plotFile0, plotFile, plotFileC, plotFilePDF;
-	setupOutputFilePaths(plotFile0, plotFile, plotFileC, plotFilePDF);
-
-	TH1 * histoResets[9] = {hMultiplicity, hRapidity1D, hRapidity2D, hTensorProduct2D, 
-		hR2, hConstant2D, hR2_dRapidity, hR2_dRapidity_N, hR2_dRapidityBaseline};
-	resetHistograms(histoResets, 9);
-
-	TH1 * histosNormalize[5] = {hRapidity1D, hRapidity2D, hRapidity3D, hR2, hR3};
-	normalizeHistograms(histosNormalize, nEvents, 5);
-
-	if(runR2) {
-		fill2DTensorProduct();
-		fillConstant2DHistogram(-1.0);
-		calculateR2Histogram();
-		float baseC2 = getC2Baseline(hMultiplicity);
-		applyC2BaselineAdjustment(baseC2);
-		fillR2dRapidityHistogram();
-		fillR2dRapidityBaseHistogram();
-		double integral = calculateIntegral(baseC2);
-		drawR2HistogramsToFile(canvases, iCanvas, plotFile0, integral);
-	}
-
-	if(runR3) {
-		fill3DTensorProduct();
-		fillConstant3DHistogram(+2.0);
-		fillC2rho1Histogram();
-		calculateR3Histogram();
-		float baseC3 = getC3Baseline(hMultiplicity);
-		applyC3BaselineAdjustment(baseC3);
-		fillR3dRapidityHistogram();
-		drawR3HistogramsToFile(canvases, iCanvas, plotFile);
-	}
-		
-	setStyle();
-	executeFilePlots(canvases, iCanvas, plotFileC, plotFile, plotFilePDF);
+int addUrQMDEventsFromPath(TChain *chain) {
+    TString path = TString("/nfs/rhi/UrQMD/events_2016/007/");
+	TString	filenames = TString("urqmd_19_0005_*.root");
+	TString input = path + filenames;
+	cout << input.Data() << endl;
+	chain->Add(input.Data());
+	int neventtree = chain->GetEntries();
+	cout << "N_events = " << neventtree << endl;
+	return neventtree;
 }
 
-void RapCorr::resetHistograms(TH1 ** histograms, int size) {
-	for(int i = 0; i < size; i++) {
-		histograms[i]->Reset();
-	}
-}
+double * fillRapidities(TrackInfo &info, int N_TRACKS, int &N_PROTON_TRACKS) {
+	double *rapidityArr = new double[N_TRACKS];
+	int protonCount = 0; 
+	const int PROTON = 14;
 
-void RapCorr::setupOutputFilePaths(TString &plotFile0, TString &plotFile, 
-	TString &plotFileC, TString &plotFilePDF) {
-
-	TString plotFileBase, rootOutFile;
-
-	rootOutFile	= TString(Form("./root/etacorr.root"));
-	plotFileBase = TString(Form("./ps/etacorr"));
-	cout << "root file = " << rootOutFile.Data() << endl;
-	cout << "plot file = " << plotFileBase.Data() << endl;
-	plotFile0 = plotFileBase + TString(".ps(");
-	plotFile = plotFileBase + TString(".ps");
-	plotFileC = plotFileBase + TString(".ps]");
-	plotFilePDF	= plotFileBase + TString(".pdf");
-}
-
-void RapCorr::fill1DRapidityDist(double *rapidityArr, int nTracks) {
-	for(int i = 0; i < nTracks; i++) {
-		hRapidity1D->Fill(rapidityArr[i]);
-	}
-}
-
-void RapCorr::fill2DRapidityDist(double *rapidityArr, int nTracks) {
-	for(int i = 0; i < nTracks; i++) {			
-		for(int j = 0; j < nTracks; j++) {
-			if(i != j) {
-				hRapidity2D->Fill(rapidityArr[i], rapidityArr[j]);
-				hR2->Fill(rapidityArr[i], rapidityArr[j]);
-			}
+	for(int iTrack = 0; iTrack < N_TRACKS; iTrack++) {
+		getInfo(info.geantID[iTrack], info.px[iTrack], info.py[iTrack], info.pz[iTrack], 
+			info.name, info.mass, info.charge, info.lifetime, info.eta, info.rapidity, info.phi, info.pTotal, info.pt, info.baryonNo);
+		if(info.geantID[iTrack] == PROTON && abs(info.rapidity) <= 1.0) { 
+			rapidityArr[protonCount] = info.rapidity;
+			protonCount++;
 		}
 	}
+	N_PROTON_TRACKS = protonCount;
+	return rapidityArr;
 }
 
-void RapCorr::fill3DRapidityDist(double *rapidityArr, int nTracks) {
-	for(int i = 0; i < nTracks; i++) {
-		for(int j = 0; j < nTracks; j++) {
-			for (int k = 0; k < nTracks; k++) {
-				if (i != j && i != k && j != k) {
-					hRapidity3D->Fill(rapidityArr[i], rapidityArr[j], rapidityArr[k]);
-					hR3->Fill(rapidityArr[i], rapidityArr[j], rapidityArr[k]);
-				}
-			}
-		}
-	}
-}
+void getInfo(int geantID, float px, float py, float pz, 
+        TString &name, float &mass, float &charge, float &lifetime,
+        float &eta, float &rapidity, float &phi, 
+        float &pTotal, float &pt, float &baryonNo) {
 
+        mass = charge = lifetime = -9; 
+        if(geantID == 1)      {name = TString("GAMMA");         mass = .0000E+00; charge =  0.; lifetime = .10000E+16; baryonNo =  0;}
+        else if(geantID == 2) {name = TString("POSITRON");      mass = .5110E-03; charge =  1.; lifetime = .10000E+16; baryonNo =  0;}
+        else if(geantID == 3) {name = TString("ELECTRON");      mass = .5110E-03; charge = -1.; lifetime = .10000E+16; baryonNo =  0;}
+        else if(geantID == 4) {name = TString("NEUTRINO");      mass = .0000E+00; charge =  0.; lifetime = .10000E+16; baryonNo =  0;}
+        else if(geantID == 5) {name = TString("MUON+");         mass = .1057E+00; charge =  1.; lifetime = .21970E-05; baryonNo =  0;}
+        else if(geantID == 6) {name = TString("MUON-");         mass = .1057E+00; charge = -1.; lifetime = .21970E-05; baryonNo =  0;}
+        else if(geantID == 7) {name = TString("PION0");         mass = .1350E+00; charge =  0.; lifetime = .84000E-16; baryonNo =  0;}
+        else if(geantID == 8) {name = TString("PION+");         mass = .1396E+00; charge =  1.; lifetime = .26030E-07; baryonNo =  0;}
+        else if(geantID == 9) {name = TString("PION-");         mass = .1396E+00; charge = -1.; lifetime = .26030E-07; baryonNo =  0;}
+        else if(geantID == 10) {name = TString("KAON0LONG");    mass = .4977E+00; charge =  0.; lifetime = .51700E-07; baryonNo =  0;}
+        else if(geantID == 11) {name = TString("KAON+");        mass = .4937E+00; charge =  1.; lifetime = .12370E-07; baryonNo =  0;}
+        else if(geantID == 12) {name = TString("KAON-");        mass = .4937E+00; charge = -1.; lifetime = .12370E-07; baryonNo =  0;}
+        else if(geantID == 13) {name = TString("NEUTRON");      mass = .9396E+00; charge =  0.; lifetime = .88700E+03; baryonNo =  1;}
+        else if(geantID == 14) {name = TString("PROTON");       mass = .9383E+00; charge =  1.; lifetime = .10000E+16; baryonNo =  1;}
+        else if(geantID == 15) {name = TString("ANTIPROTON");   mass = .9383E+00; charge = -1.; lifetime = .10000E+16; baryonNo = -1;}
+        else if(geantID == 16) {name = TString("KAON 0 SHORT"); mass = .4977E+00; charge =  0.; lifetime = .89260E-10; baryonNo =  0;}
+        else if(geantID == 17) {name = TString("ETA");          mass = .5475E+00; charge =  0.; lifetime = .54850E-18; baryonNo =  0;}
+        else if(geantID == 18) {name = TString("LAMBDA");       mass = .1116E+01; charge =  0.; lifetime = .26320E-09; baryonNo =  1;}
+        else if(geantID == 19) {name = TString("SIGMA+");       mass = .1189E+01; charge =  1.; lifetime = .79900E-10; baryonNo =  1;}
+        else if(geantID == 20) {name = TString("SIGMA0");       mass = .1193E+01; charge =  0.; lifetime = .74000E-19; baryonNo =  1;}
+        else if(geantID == 21) {name = TString("SIGMA-");       mass = .1197E+01; charge = -1.; lifetime = .14790E-09; baryonNo =  1;}
+        else if(geantID == 22) {name = TString("XI0");          mass = .1315E+01; charge =  0.; lifetime = .29000E-09; baryonNo =  1;}
+        else if(geantID == 23) {name = TString("XI-");          mass = .1321E+01; charge = -1.; lifetime = .16390E-09; baryonNo =  1;}
+        else if(geantID == 24) {name = TString("OMEGA-");       mass = .1672E+01; charge = -1.; lifetime = .82200E-10; baryonNo =  1;}
+        else if(geantID == 25) {name = TString("ANTINEUTRON");  mass = .9396E+00; charge =  0.; lifetime = .88700E+03; baryonNo = -1;}
+        else if(geantID == 26) {name = TString("ANTILAMBDA");   mass = .1116E+01; charge =  0.; lifetime = .26320E-09; baryonNo = -1;}
+        else if(geantID == 27) {name = TString("ANTISIGMA-");   mass = .1189E+01; charge = -1.; lifetime = .79900E-10; baryonNo = -1;}
+        else if(geantID == 28) {name = TString("ANTISIGMA0");   mass = .1193E+01; charge =  0.; lifetime = .74000E-19; baryonNo = -1;}
+        else if(geantID == 29) {name = TString("ANTISIGMA+");   mass = .1197E+01; charge =  1.; lifetime = .14790E-09; baryonNo = -1;}
+        else if(geantID == 30) {name = TString("ANTIXI0");      mass = .1315E+01; charge =  0.; lifetime = .29000E-09; baryonNo = -1;}
+        else if(geantID == 31) {name = TString("ANTIXI+");      mass = .1321E+01; charge =  1.; lifetime = .16390E-09; baryonNo = -1;}
+        else if(geantID == 32) {name = TString("ANTIOMEGA+");   mass = .1672E+01; charge =  1.; lifetime = .82200E-10; baryonNo = -1;}
+        else if(geantID == 45) {name = TString("DEUTERON");     mass = .1876E+01; charge =  1.; lifetime = .10000E+16; baryonNo =  2;}
+        else if(geantID == 46) {name = TString("TRITON");       mass = .2809E+01; charge =  1.; lifetime = .10000E+16; baryonNo =  3;}
+        else if(geantID == 47) {name = TString("ALPHA");        mass = .3727E+01; charge =  2.; lifetime = .10000E+16; baryonNo =  4;}
+        else if(geantID == 48) {name = TString("GEANTINO");     mass = .0000E+00; charge =  0.; lifetime = .10000E+16; baryonNo =  0;}
+        else if(geantID == 49) {name = TString("HE3");          mass = .2809E+01; charge =  2.; lifetime = .10000E+16; baryonNo =  3;}
+        else if(geantID == 50) {name = TString("Cerenkov");     mass = .0000E+00; charge =  0.; lifetime = .10000E+16; baryonNo =  0;}
+         
+        if(mass < 0) { cout << "Unknown particle " << geantID << endl; }
+        
+        pt = sqrt(px * px + py * py);
+        pTotal = sqrt(pt * pt + pz * pz);
+        float E_Total = sqrt(mass * mass + pTotal * pTotal);
+        rapidity = 0.5 * TMath::Log( (E_Total + pz) / (E_Total - pz) );
 
-void RapCorr::normalizeHistograms(TH1 **histos, int normConst, int size) {
-	for(int i = 0; i < size; i++) {
-		histos[i]->Scale(1. / normConst);
-	}
-}
-
-void RapCorr::fill2DTensorProduct() {
-	int nbin = hRapidity1D->GetNbinsX();
-	for(int ibin = 1; ibin <= nbin; ibin++) {
-		float valx1	= hRapidity1D->GetBinCenter(ibin);
-		float valn1	= hRapidity1D->GetBinContent(ibin);
-		for(int jbin = 1; jbin <= nbin; jbin++) {
-			float valx2	= hRapidity1D->GetBinCenter(jbin);
-			float valn2	= hRapidity1D->GetBinContent(jbin);
-			hTensorProduct2D->Fill(valx1, valx2, valn1 * valn2);
-		}
-	}
-}
-
-void RapCorr::fill3DTensorProduct() {
-	int nbin = hRapidity1D->GetNbinsX();
-	for(int ibin = 1; ibin <= nbin; ibin++) {
-		float valx1	= hRapidity1D->GetBinCenter(ibin);
-		float valn1	= hRapidity1D->GetBinContent(ibin);
-		for(int jbin = 1; jbin <= nbin; jbin++) {
-			float valx2	= hRapidity1D->GetBinCenter(jbin);
-			float valn2	= hRapidity1D->GetBinContent(jbin);
-			for(int kbin = 1; kbin <= nbin; kbin++) {
-				float valx3	= hRapidity1D->GetBinCenter(kbin);
-				float valn3	= hRapidity1D->GetBinContent(kbin);
-				hTensorProduct3D->Fill(valx1, valx2, valx3, valn1 * valn2 * valn3);
-			}
-		}
-	}
-}
-
-
-void RapCorr::fillConstant2DHistogram(float val) {
-	int nbin = hRapidity1D->GetNbinsX();
-	for(int ibin = 1; ibin <= nbin; ibin++) {
-		float valx1	= hRapidity1D->GetBinCenter(ibin);
-		for(int jbin = 1; jbin <= nbin; jbin++) {
-			float valx2	= hRapidity1D->GetBinCenter(jbin);
-			hConstant2D->Fill(valx1, valx2, val);
-		}
-	}
-}
-
-void RapCorr::fillConstant3DHistogram(float val) {
-	int nbin = hRapidity1D->GetNbinsX();
-	for(int ibin = 1; ibin <= nbin; ibin++) {
-		float valx1	= hRapidity1D->GetBinCenter(ibin);
-		for(int jbin = 1; jbin <= nbin; jbin++) {
-			float valx2 = hRapidity1D->GetBinCenter(jbin);
-			for(int kbin = 1; kbin <= nbin; kbin++) {
-				float valx3	= hRapidity1D->GetBinCenter(kbin);
-				hConstant3D->Fill(valx1, valx2, valx3, val);
-			}
-		}
-	}
-}
-
-void RapCorr::fillC2rho1Histogram() {
-	int nbin = hRapidity1D->GetNbinsX();
-	float valxi, valxj, valxk, valnij, valnk;
-	for(int ibin = 1; ibin <= nbin; ibin++) {
-		for(int jbin = 1; jbin <= nbin; jbin++) {
-			valxi = hRapidity2D->GetXaxis()->GetBinCenter(ibin);
-			valxj = hRapidity2D->GetYaxis()->GetBinCenter(jbin);
-			valnij = hRapidity2D->GetBinContent(ibin, jbin);
-
-			for(int kbin = 1; kbin <= nbin; kbin++) {
-				valxk = hRapidity1D->GetBinCenter(kbin);
-				valnk = hRapidity1D->GetBinContent(kbin);
-				hC2rho1->Fill(valxi, valxj, valxk, valnij * valnk);
-			}
-		}
-	}
-}
-
-
-
-void RapCorr::calculateR2Histogram() {
-	hR2->Divide(hTensorProduct2D);
-	hR2->Add(hConstant2D);
-}
-
-void RapCorr::calculateR3Histogram() {
-	hR3->Divide(hTensorProduct3D);
-	hC2rho1->Divide(hTensorProduct3D);
-	hC2rho1->Scale(3.0);
-	hR3->Add(hC2rho1, -1.0);
-	hR3->Add(hConstant3D);
-}
-
-void RapCorr::fillR2dRapidityHistogram() {
-	for(int ibx = 1; ibx <= numBins; ibx++) {								
-		for(int iby = 1; iby <= numBins; iby++) {						
-			float dEtaXY;									
-			dEtaXY = hR2->GetXaxis()->GetBinCenter(ibx) 		
-			       - hR2->GetYaxis()->GetBinCenter(iby);
-			hR2_dRapidity->Fill(dEtaXY, hR2->GetBinContent(ibx, iby));
-			hR2_dRapidity_N->Fill(dEtaXY, 1.0);
-		}	
-	} 
-	hR2_dRapidity->Divide(hR2_dRapidity_N);
-}
-
-void RapCorr::fillR3dRapidityHistogram() {
-	for(int ibx = 1; ibx <= numBins; ibx++) {						
-		for(int iby = 1; iby <= numBins; iby++) {						
-			for(int ibz = 1; ibz <= numBins; ibz++) {					
-				float dEtaXY, dEtaXZ;									
-				dEtaXY	= hR3->GetXaxis()->GetBinCenter(ibx) 		
-			            - hR3->GetYaxis()->GetBinCenter(iby);
-				dEtaXZ	= hR3->GetXaxis()->GetBinCenter(ibx) 		
-			        	- hR3->GetZaxis()->GetBinCenter(ibz);
-			    hR3_dRapidity->Fill(dEtaXY, dEtaXZ, hR3->GetBinContent(ibx, iby, ibz));
-			    hR3_dRapidity_N->Fill(dEtaXY, dEtaXZ, 1.0);
-			}
-		}	
-	}
-	hR3_dRapidity->Divide(hR3_dRapidity_N);
-}
-
-
-float RapCorr::getC2Baseline(TH1D *hmult){
-	if(!hmult) { exit(0); }
-	float nent = (float)hmult->GetEntries();
-	if(!nent) {exit(0); }
-	TH1D *hMultWork	= (TH1D*)hmult->Clone("hMultWork");
-	hMultWork->Scale(1. / nent);
-	int nBinsX = hMultWork->GetNbinsX();
-
-	float sumNum = 0;
-	float sumDen = 0;
-	float result = 0;
-
-	for(int ibx = 1; ibx <= nBinsX; ibx++) {
-		float ni = hMultWork->GetBinCenter(ibx);
-		float yi = hMultWork->GetBinContent(ibx);		
-		sumNum += yi * ni * (ni - 1.);
-		sumDen += yi * ni;
-	}
-	if(sumDen != 0.0) {
-		result = sumNum / sumDen / sumDen - 1.;
-	}
-	delete hMultWork; hMultWork = 0;
-	return result;
-}
-
-float RapCorr::getC3Baseline(TH1D *hmult){
-	if(!hmult) { exit(0); }
-	float nent = (float)hmult->GetEntries();
-	if(!nent) { exit(0); }
-	TH1D *hMultWork	= (TH1D*)hmult->Clone("hMultWork");
-	hMultWork->Scale(1./nent);
-	int nBinsX = hMultWork->GetNbinsX();
-
-	float sumNum3 = 0;
-	float sumNum2 = 0;
-	float sumDen = 0;
-
-	for(int ibx = 1; ibx <= nBinsX; ibx++) {
-		float ni = hMultWork->GetBinCenter(ibx);		
-		float yi = hMultWork->GetBinContent(ibx);		
-		sumNum3 += yi * ni * (ni - 1.) * (ni - 2.);
-		sumNum2	+= yi * ni * (ni - 1.);
-		sumDen += yi * ni;
-	}
-
-	float result = 0;
-	float term3 = 0;
-	float term2	= 0;
-
-	if(sumDen != 0.0) {
-		term3 = sumNum3 / sumDen / sumDen / sumDen;
-		term2 = sumNum2 / sumDen / sumDen;
-		result = term3 - 3 * term2 + 2.;
-	}
-	delete hMultWork; hMultWork=0;
-	return result;
-}
-
-
-void RapCorr::applyC2BaselineAdjustment(float baseC2) {
-	for(int ibx = 1; ibx <= numBins; ibx++) {
-		for (int iby = 1; iby <= numBins; iby++) {
-			float oval2	= hR2->GetBinContent(ibx, iby);
-			hR2->SetBinContent(ibx, iby, oval2 - baseC2);
-		}
-	}
-}
-
-void RapCorr::applyC3BaselineAdjustment(float baseC3) {
-	for(int ibx = 1; ibx <= numBins; ibx++) {
-		for (int iby = 1; iby <= numBins; iby++) {
-			for(int ibz = 1; ibz <= numBins; ibz++) {
-				float oval3	= hR3->GetBinContent(ibx, iby, ibz);
-				hR3->SetBinContent(ibx, iby, ibz, oval3 - baseC3);
-			}
-		}
-	}
-}
-
-
-void RapCorr::fillR2dRapidityBaseHistogram() { 
-	for(int ibin = 1; ibin <= hR2_dRapidity->GetNbinsX(); ibin++) {
-		float val = hR2_dRapidity->GetBinContent(ibin);
-		float valErr = hR2_dRapidity->GetBinError(ibin);	// INCORRECT ERRORS VALS
-		hR2_dRapidityBaseline->SetBinContent(ibin, val);	// straight copy now...
-		hR2_dRapidityBaseline->SetBinError(ibin, valErr);	// INCORRECT ERRORS VALS.
-	}
-}
-
-double RapCorr::calculateIntegral(float baseline) {
-	double integral = 0;
-	int numBins = hR2_dRapidityBaseline->GetNbinsX();
-	for(int i = 1; i < numBins; i++) {
-		double value = hR2_dRapidityBaseline->GetBinContent(i);
-		integral += (value - baseline);
-	}
-	return integral;
-}
-
-
-void RapCorr::setStyle() {
-	gStyle->SetPaperSize(TStyle::kUSLetter);
-	gStyle->SetLabelSize(0.05,"X");
-	gStyle->SetLabelSize(0.05,"Y");
-	gStyle->SetTitleXSize(0.055);
-	gStyle->SetTitleYSize(0.055);
-	gStyle->SetTitleOffset(0.85,"X");
-	gStyle->SetTitleOffset(1.2,"Y");
-	gStyle->SetOptStat(111110);
-	gStyle->SetStatStyle(0); 
-	gStyle->SetTitleStyle(0); 
-	gStyle->SetStatX(0.94);
-	gStyle->SetStatY(0.92);
-	gStyle->SetStatH(0.26);
-	gStyle->SetStatW(0.4);
-	gStyle->SetErrorX(0.0001);
-	gStyle->SetPadRightMargin(0.06);
-	gStyle->SetPadTopMargin(0.08);
-	gStyle->SetPadBottomMargin(0.05);
-	gStyle->SetPadLeftMargin(0.08);
-	gStyle->SetTitleX(0.5);
-	gStyle->SetTitleY(1.0);
-	gStyle->SetTitleW(0.75);
-	gStyle->SetTitleH(0.075);
-	gStyle->SetTitleTextColor(1);
-	gStyle->SetTitleSize(0.1,"T");
-	gStyle->SetPalette(1);
-	gStyle->SetHistMinimumZero(kFALSE);
-	gStyle->SetHatchesSpacing(2);
-	gStyle->SetHatchesLineWidth(2);
-}
-
-void RapCorr::drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile0, double integral) {
-		TLatex * text = new TLatex();
-		text->SetTextSize(0.05);
-		text->SetNDC();
-		char buf[200];
-		iCanvas++;
-		sprintf(buf, "canvases%d", iCanvas);
-		canvases[iCanvas] = new TCanvas(buf, buf, 30 * iCanvas, 30 * iCanvas, 800, (8.5 / 11.) * 800);
-		canvases[iCanvas]->cd(); 
-		canvases[iCanvas]->Divide(3,2,0.0001,0.0001);
-			canvases[iCanvas]->cd(1);
-				hMultiplicity->Draw();
-			canvases[iCanvas]->cd(2);
-				hRapidity1D->SetMinimum(0.5);
-				hRapidity1D->Draw();
-			canvases[iCanvas]->cd(3);
-				hRapidity2D->SetStats(0);
-				hRapidity2D->Draw("colz");
-			canvases[iCanvas]->cd(4);
-				hR2->SetStats(0);
-				hR2->Draw("colz");
-			canvases[iCanvas]->cd(5);
-				hR2_dRapidityBaseline->SetStats(0);
-				hR2_dRapidityBaseline->SetMinimum(-0.005);
-				hR2_dRapidityBaseline->SetMaximum(0.005);
-				hR2_dRapidityBaseline->SetMarkerStyle(20);
-				hR2_dRapidityBaseline->SetMarkerSize(1);
-				hR2_dRapidityBaseline->SetMarkerColor(4);
-				hR2_dRapidityBaseline->SetLineColor(4);
-				hR2_dRapidityBaseline->Draw("hist");
-				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral));
-			canvases[iCanvas]->cd(6);
-				hR2_dRapidityBaseline->Draw();
-		canvases[iCanvas]->cd(); 
-		canvases[iCanvas]->Update();
-		canvases[iCanvas]->Print(plotFile0.Data());
-}
-
-void RapCorr::drawR3HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile) {
-		char buf[200];
-		iCanvas++;	
-		gStyle->SetOptStat(0);
-		gStyle->SetPadRightMargin(0.15);
-		iCanvas++;
-		sprintf(buf, "canvases%d", iCanvas);
-		canvases[iCanvas] = new TCanvas(buf, buf, 30 * iCanvas, 30 * iCanvas, 800, (8.5 / 11.) * 800);
-		canvases[iCanvas]->cd(); 
-		canvases[iCanvas]->Divide(3, 2, 0.0001, 0.0001);
-			canvases[iCanvas]->cd(1);
-				hR2_dRapidityBaseline->Draw("HIST");
-			canvases[iCanvas]->cd(2);
-				hR3_dRapidity->Draw("COLZ1");
-			canvases[iCanvas]->cd(3);
-				hR3_dRapidity_N->Draw("COLZ1");
-			canvases[iCanvas]->cd(4);
-			canvases[iCanvas]->cd(5);
-			canvases[iCanvas]->cd(6);
-		canvases[iCanvas]->cd(); 
-		canvases[iCanvas]->Update();
-		canvases[iCanvas]->Print(plotFile.Data());
-		gStyle->SetPadRightMargin(0.06);
-}
-
-void RapCorr::executeFilePlots(TCanvas **canvases, int iCanvas, TString plotFileC, 
-	TString plotFile, TString plotFilePDF) {
-		char buf[200];
-	 	canvases[iCanvas]->Print(plotFileC.Data());
-	 	sprintf(buf, "/usr/bin/pstopdf %s -o %s", plotFile.Data(), plotFilePDF.Data());
-	 	cout << " " << buf << endl;
-	 	gSystem->Exec(buf);
+        if(pz != 0.0 && pTotal > 0.001) { 
+             TVector3 pVect(px, py, pz);
+             eta = pVect.PseudoRapidity(); 
+        } 
+        else {
+             eta = 0;
+        }
 }
