@@ -39,22 +39,26 @@ RapCorr::~RapCorr() {
 }
 
 void RapCorr::book() {
-	hRapidity1D = new TH1D("hRapidity1D", "Rapidity 1D", numBins, -yLower, yUpper);
-	hRapidity2D = new TH2D("hRapidity2D", "#y_{2} vs #y_{1}", numBins, -yLower, yUpper, numBins, yLower, yUpper);
-	hTensorProduct2D = new TH2D("hTensorProduct2D", "Tensor Product 2D", numBins, yLower, yUpper, numBins, yLower, yUpper);
-	hR2 = new TH2D("hR2", "R_{2} vs (#y_{1},#y_{2})", numBins, yLower, yUpper, numBins, yLower, yUpper);
-	hConstant2D = new TH2D("hConstant2D", "hConstant2D", numBins, yLower, yUpper, numBins, yLower, yUpper);
-	hR2_dRapidity = new TH1D("hR2_dRapidity", "#LTR_{2}#GT vs #y_{1}-#y_{2}", numBinsDY, yLowerDY, yUpperDY);
-	hR2_dRapidity_N = new TH1D("hR2_dRapidity_N", "NBINS vs #y_{1}-#y_{2}", numBinsDY, yLowerDY, yUpperDY);
-	hR2_dRapidityBaseline = new TH1D("hR2_dRapidityBaseline", "#LTR_{2}#GT-Baseline vs #y_{1}-#y_{2}", numBinsDY, yLowerDY, yUpperDY);
+	if(runR2) {
+		hRapidity1D = new TH1D("hRapidity1D", "Rapidity 1D", numBins, -yLower, yUpper);
+		hRapidity2D = new TH2D("hRapidity2D", "#y_{2} vs #y_{1}", numBins, -yLower, yUpper, numBins, yLower, yUpper);
+		hTensorProduct2D = new TH2D("hTensorProduct2D", "Tensor Product 2D", numBins, yLower, yUpper, numBins, yLower, yUpper);
+		hR2 = new TH2D("hR2", "R_{2} vs (#y_{1},#y_{2})", numBins, yLower, yUpper, numBins, yLower, yUpper);
+		hConstant2D = new TH2D("hConstant2D", "hConstant2D", numBins, yLower, yUpper, numBins, yLower, yUpper);
+		hR2_dRapidity = new TH1D("hR2_dRapidity", "#LTR_{2}#GT vs #y_{1}-#y_{2}", numBinsDY, yLowerDY, yUpperDY);
+		hR2_dRapidity_N = new TH1D("hR2_dRapidity_N", "NBINS vs #y_{1}-#y_{2}", numBinsDY, yLowerDY, yUpperDY);
+		hR2_dRapidityBaseline = new TH1D("hR2_dRapidityBaseline", "#LTR_{2}#GT-Baseline vs #y_{1}-#y_{2}", numBinsDY, yLowerDY, yUpperDY);
+	}
 
-	hRapidity3D = new TH3D("hRapidity3D", "Rapidity 3D", numBins, yLower, yUpper, numBins, yLower, yUpper, numBins, yLower, yUpper);
-	hR3 = new TH3D("hR3", "hR3", numBins, yLower, yUpper, numBins, yLower, yUpper, numBins, yLower, yUpper);
-	hTensorProduct3D = new TH3D("hTensorProduct3D", "Tensor Product 3D", numBins, yLower, yUpper, numBins, yLower, yUpper, numBins, yLower, yUpper);
-	hC2rho1 = new TH3D("hC2rho1","hC2rho1", numBins, yLower, yUpper, numBins, yLower, yUpper, numBins, yLower, yUpper);
-	hConstant3D = new TH3D("hConstant3D", "Constant 3D", numBins, yLower, yUpper, numBins, yLower, yUpper, numBins, yLower, yUpper);
-	hR3_dRapidity = new TH2D("hR3_dRapidity", "#LTR_{3}#GT vs (#Delta#y_{12}, #Delta#y_{13})", numBinsDY, yLowerDY, yUpperDY, numBinsDY, yLowerDY, yUpperDY);
-	hR3_dRapidity_N	= new TH2D("hR3_dRapidity_N", "NBINS vs (#Delta#y_{12}, #Delta#y_{13})", numBinsDY, yLowerDY, yUpperDY, numBinsDY, yLowerDY, yUpperDY);
+	if(runR3) {
+		hRapidity3D = new TH3D("hRapidity3D", "Rapidity 3D", numBins, yLower, yUpper, numBins, yLower, yUpper, numBins, yLower, yUpper);
+		hR3 = new TH3D("hR3", "hR3", numBins, yLower, yUpper, numBins, yLower, yUpper, numBins, yLower, yUpper);
+		hTensorProduct3D = new TH3D("hTensorProduct3D", "Tensor Product 3D", numBins, yLower, yUpper, numBins, yLower, yUpper, numBins, yLower, yUpper);
+		hC2rho1 = new TH3D("hC2rho1","hC2rho1", numBins, yLower, yUpper, numBins, yLower, yUpper, numBins, yLower, yUpper);
+		hConstant3D = new TH3D("hConstant3D", "Constant 3D", numBins, yLower, yUpper, numBins, yLower, yUpper, numBins, yLower, yUpper);
+		hR3_dRapidity = new TH2D("hR3_dRapidity", "#LTR_{3}#GT vs (#Delta#y_{12}, #Delta#y_{13})", numBinsDY, yLowerDY, yUpperDY, numBinsDY, yLowerDY, yUpperDY);
+		hR3_dRapidity_N	= new TH2D("hR3_dRapidity_N", "NBINS vs (#Delta#y_{12}, #Delta#y_{13})", numBinsDY, yLowerDY, yUpperDY, numBinsDY, yLowerDY, yUpperDY);
+	}
 }
 
 void RapCorr::increment(double *rapidities, int nTracks) {
@@ -73,15 +77,6 @@ void RapCorr::increment(double *rapidities, int nTracks) {
 }
 
 void RapCorr::calculate() {
-	int iCanvas = -1;
-	TCanvas *canvases[100];
-	TString plotFile0, plotFile, plotFileC, plotFilePDF;
-	setupOutputFilePaths(plotFile0, plotFile, plotFileC, plotFilePDF);
-
-	TH1 * histoResets[9] = {hMultiplicity, hRapidity1D, hRapidity2D, hTensorProduct2D, 
-		hR2, hConstant2D, hR2_dRapidity, hR2_dRapidity_N, hR2_dRapidityBaseline};
-	resetHistograms(histoResets, 9);
-
 	TH1 * histosNormalize[5] = {hRapidity1D, hRapidity2D, hRapidity3D, hR2, hR3};
 	normalizeHistograms(histosNormalize, nEvents, 5);
 
@@ -107,15 +102,15 @@ void RapCorr::calculate() {
 		fillR3dRapidityHistogram();
 		drawR3HistogramsToFile(canvases, iCanvas, plotFile);
 	}
-		
-	setStyle();
-	executeFilePlots(canvases, iCanvas, plotFileC, plotFile, plotFilePDF);
 }
 
-void RapCorr::resetHistograms(TH1 ** histograms, int size) {
-	for(int i = 0; i < size; i++) {
-		histograms[i]->Reset();
-	}
+void RapCorr::plot() {
+	int iCanvas = -1;
+	TCanvas *canvases[100];
+	TString plotFile0, plotFile, plotFileC, plotFilePDF;
+	setupOutputFilePaths(plotFile0, plotFile, plotFileC, plotFilePDF);
+	setStyle();
+	executeFilePlots(canvases, iCanvas, plotFileC, plotFile, plotFilePDF);
 }
 
 void RapCorr::setupOutputFilePaths(TString &plotFile0, TString &plotFile, 

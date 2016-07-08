@@ -56,30 +56,8 @@ class RapCorr{
 		virtual void resetHistograms(TH1**, int);
 		virtual void setupOutputFilePaths(TString&, TString&, TString&, TString&);
 		virtual void calculate();
+		virtual void plot();
 		virtual void increment(double*, int);
-		virtual void fill1DRapidityDist(double*, int);
-		virtual void fill2DRapidityDist(double*, int);
-		virtual void fill3DRapidityDist(double*, int);
-		virtual void normalizeHistograms(TH1**, int, int);
-		virtual void fill2DTensorProduct();
-		virtual void fill3DTensorProduct();
-		virtual void fillConstant2DHistogram(float);
-		virtual void fillConstant3DHistogram(float);
-		virtual void fillC2rho1Histogram();
-		virtual void calculateR2Histogram();
-		virtual void calculateR3Histogram();
-		virtual float getC2Baseline(TH1D*);
-		virtual float getC3Baseline(TH1D*);
-		virtual void applyC2BaselineAdjustment(float);
-		virtual void applyC3BaselineAdjustment(float);
-		virtual void fillR2dRapidityHistogram();
-		virtual void fillR3dRapidityHistogram();
-		virtual void fillR2dRapidityBaseHistogram();
-		virtual double calculateIntegral(float);
-		virtual void setStyle();
-		virtual void drawR2HistogramsToFile(TCanvas**, int&, TString, double);
-		virtual void drawR3HistogramsToFile(TCanvas**, int&, TString);
-		virtual void executeFilePlots(TCanvas**, int, TString, TString, TString);
 	
 		virtual void setRunR2(bool);
 		virtual void setRunR3(bool);
@@ -132,6 +110,29 @@ class RapCorr{
 		TH2D *hR3_dRapidity;
 		TH2D *hR3_dRapidity_N;
 
+		virtual void fill1DRapidityDist(double*, int);
+		virtual void fill2DRapidityDist(double*, int);
+		virtual void fill3DRapidityDist(double*, int);
+		virtual void normalizeHistograms(TH1**, int, int);
+		virtual void fill2DTensorProduct();
+		virtual void fill3DTensorProduct();
+		virtual void fillConstant2DHistogram(float);
+		virtual void fillConstant3DHistogram(float);
+		virtual void fillC2rho1Histogram();
+		virtual void calculateR2Histogram();
+		virtual void calculateR3Histogram();
+		virtual float getC2Baseline(TH1D*);
+		virtual float getC3Baseline(TH1D*);
+		virtual void applyC2BaselineAdjustment(float);
+		virtual void applyC3BaselineAdjustment(float);
+		virtual void fillR2dRapidityHistogram();
+		virtual void fillR3dRapidityHistogram();
+		virtual void fillR2dRapidityBaseHistogram();
+		virtual double calculateIntegral(float);
+		virtual void setStyle();
+		virtual void drawR2HistogramsToFile(TCanvas**, int&, TString, double);
+		virtual void drawR3HistogramsToFile(TCanvas**, int&, TString);
+		virtual void executeFilePlots(TCanvas**, int, TString, TString, TString);
 };
 
 inline void RapCorr::setRunR2(bool b){ runR2=b; return; }
