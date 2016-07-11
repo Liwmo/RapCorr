@@ -82,6 +82,7 @@ void plotRapidityCorrelations() {
 		delete[] rapidityArr; rapidityArr = 0;	
 	}
 	rapCorr->calculate();
+	rapCorr->plot();
 	delete rapCorr; rapCorr = 0;
 }
 

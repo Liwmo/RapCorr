@@ -100,9 +100,6 @@ void RapCorr::calculate() {
 		fillR3dRapidityHistogram();
 		drawR3HistogramsToFile(canvases, iCanvas, plotFile);
 	}
-		
-	setStyle();
-	executeFilePlots(canvases, iCanvas, plotFileC, plotFile, plotFilePDF);
 }
 
 void RapCorr::setupOutputFilePaths(TString &plotFile0, TString &plotFile, 
