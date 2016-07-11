@@ -53,7 +53,6 @@ class RapCorr{
 		RapCorr();				
 		virtual ~RapCorr();	
 		virtual void book();	
-		virtual void resetHistograms(TH1**, int);
 		virtual void setupOutputFilePaths(TString&, TString&, TString&, TString&);
 		virtual void calculate();
 		virtual void increment(double*, int);
@@ -74,7 +73,6 @@ class RapCorr{
 		virtual void applyC3BaselineAdjustment(float);
 		virtual void fillR2dRapidityHistogram();
 		virtual void fillR3dRapidityHistogram();
-		virtual void fillR2dRapidityBaseHistogram();
 		virtual double calculateIntegral(float);
 		virtual void setStyle();
 		virtual void drawR2HistogramsToFile(TCanvas**, int&, TString, double);
@@ -122,7 +120,6 @@ class RapCorr{
 		TH2D *hConstant2D;
 		TH1D *hR2_dRapidity;
 		TH1D *hR2_dRapidity_N;
-		TH1D *hR2_dRapidityBaseline;
 
 		TH3D *hRapidity3D;
 		TH3D *hR3;
@@ -134,14 +131,14 @@ class RapCorr{
 
 };
 
-inline void RapCorr::setRunR2(bool b){ runR2=b; return; }
-inline void RapCorr::setRunR3(bool b){ runR3=b; return; }
+inline void RapCorr::setRunR2(bool b){ runR2=b; }
+inline void RapCorr::setRunR3(bool b){ runR3=b; }
 inline bool RapCorr::getRunR2(){ return runR2; }
 inline bool RapCorr::getRunR3(){ return runR3; }
-inline void RapCorr::setNumBins(int i){ numBins = i; cout<<"Changed Nbins to  "<<numBins<<endl; return; }
-inline void RapCorr::setYLower(float y){ yLower = y; cout<<"Changed Ylower to "<<yLower<<endl; return; }
-inline void RapCorr::setYUpper(float y){ yUpper = y; cout<<"Changed Yupper to "<<yUpper<<endl; return; }
-inline void RapCorr::setMaxMult(int i){ maxMult=i; cout<<"Changed MaxMult to "<<maxMult<<endl; return; }
+inline void RapCorr::setNumBins(int i){ numBins = i; cout<<"Changed Nbins to  "<<numBins<<endl; }
+inline void RapCorr::setYLower(float y){ yLower = y; cout<<"Changed Ylower to "<<yLower<<endl; }
+inline void RapCorr::setYUpper(float y){ yUpper = y; cout<<"Changed Yupper to "<<yUpper<<endl; }
+inline void RapCorr::setMaxMult(int i){ maxMult=i; cout<<"Changed MaxMult to "<<maxMult<<endl; }
 inline TH1D* RapCorr::getMultiplicity(){ return hMultiplicity; }
 inline TH1D* RapCorr::getRapidity1D(){ return hRapidity1D; }
 inline TH2D* RapCorr::getRapidity2D(){ return hRapidity2D; }

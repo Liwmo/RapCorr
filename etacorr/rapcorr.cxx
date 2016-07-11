@@ -2,7 +2,7 @@
 
 RapCorr::RapCorr() {
 	nEvents	= 0;
-	numBins = 18;
+	numBins = 36;
 	yLower = -0.72;
 	yUpper = 0.72;
 	binWidth = (yUpper - yLower) / numBins;
@@ -27,7 +27,6 @@ RapCorr::~RapCorr() {
 	delete hConstant2D; hConstant2D = 0;
 	delete hR2_dRapidity; hR2_dRapidity = 0;
 	delete hR2_dRapidity_N; hR2_dRapidity_N = 0;
-	delete hR2_dRapidityBaseline; hR2_dRapidityBaseline = 0;
 
 	delete hRapidity3D; hRapidity3D = 0;
 	delete hR3; hR3 = 0;
@@ -39,14 +38,13 @@ RapCorr::~RapCorr() {
 }
 
 void RapCorr::book() {
-	hRapidity1D = new TH1D("hRapidity1D", "Rapidity 1D", numBins, -yLower, yUpper);
-	hRapidity2D = new TH2D("hRapidity2D", "#y_{2} vs #y_{1}", numBins, -yLower, yUpper, numBins, yLower, yUpper);
+	hRapidity1D = new TH1D("hRapidity1D", "Rapidity 1D", numBins, yLower, yUpper);
+	hRapidity2D = new TH2D("hRapidity2D", "y_{2} vs y_{1}", numBins, yLower, yUpper, numBins, yLower, yUpper);
 	hTensorProduct2D = new TH2D("hTensorProduct2D", "Tensor Product 2D", numBins, yLower, yUpper, numBins, yLower, yUpper);
-	hR2 = new TH2D("hR2", "R_{2} vs (#y_{1},#y_{2})", numBins, yLower, yUpper, numBins, yLower, yUpper);
+	hR2 = new TH2D("hR2", "R_{2} vs (y_{1},y_{2})", numBins, yLower, yUpper, numBins, yLower, yUpper);
 	hConstant2D = new TH2D("hConstant2D", "hConstant2D", numBins, yLower, yUpper, numBins, yLower, yUpper);
-	hR2_dRapidity = new TH1D("hR2_dRapidity", "#LTR_{2}#GT vs #y_{1}-#y_{2}", numBinsDY, yLowerDY, yUpperDY);
-	hR2_dRapidity_N = new TH1D("hR2_dRapidity_N", "NBINS vs #y_{1}-#y_{2}", numBinsDY, yLowerDY, yUpperDY);
-	hR2_dRapidityBaseline = new TH1D("hR2_dRapidityBaseline", "#LTR_{2}#GT-Baseline vs #y_{1}-#y_{2}", numBinsDY, yLowerDY, yUpperDY);
+	hR2_dRapidity = new TH1D("hR2_dRapidity", "#LTR_{2}#GT vs y_{1}-y_{2}", numBinsDY, yLowerDY, yUpperDY);
+	hR2_dRapidity_N = new TH1D("hR2_dRapidity_N", "NBINS vs y_{1}-y_{2}", numBinsDY, yLowerDY, yUpperDY);
 
 	hRapidity3D = new TH3D("hRapidity3D", "Rapidity 3D", numBins, yLower, yUpper, numBins, yLower, yUpper, numBins, yLower, yUpper);
 	hR3 = new TH3D("hR3", "hR3", numBins, yLower, yUpper, numBins, yLower, yUpper, numBins, yLower, yUpper);
@@ -78,10 +76,6 @@ void RapCorr::calculate() {
 	TString plotFile0, plotFile, plotFileC, plotFilePDF;
 	setupOutputFilePaths(plotFile0, plotFile, plotFileC, plotFilePDF);
 
-	TH1 * histoResets[9] = {hMultiplicity, hRapidity1D, hRapidity2D, hTensorProduct2D, 
-		hR2, hConstant2D, hR2_dRapidity, hR2_dRapidity_N, hR2_dRapidityBaseline};
-	resetHistograms(histoResets, 9);
-
 	TH1 * histosNormalize[5] = {hRapidity1D, hRapidity2D, hRapidity3D, hR2, hR3};
 	normalizeHistograms(histosNormalize, nEvents, 5);
 
@@ -92,9 +86,8 @@ void RapCorr::calculate() {
 		float baseC2 = getC2Baseline(hMultiplicity);
 		applyC2BaselineAdjustment(baseC2);
 		fillR2dRapidityHistogram();
-		fillR2dRapidityBaseHistogram();
 		double integral = calculateIntegral(baseC2);
-		drawR2HistogramsToFile(canvases, iCanvas, plotFile0, integral);
+		drawR2HistogramsToFile(canvases, iCanvas, plotFilePDF, integral);
 	}
 
 	if(runR3) {
@@ -110,12 +103,6 @@ void RapCorr::calculate() {
 		
 	setStyle();
 	executeFilePlots(canvases, iCanvas, plotFileC, plotFile, plotFilePDF);
-}
-
-void RapCorr::resetHistograms(TH1 ** histograms, int size) {
-	for(int i = 0; i < size; i++) {
-		histograms[i]->Reset();
-	}
 }
 
 void RapCorr::setupOutputFilePaths(TString &plotFile0, TString &plotFile, 
@@ -291,9 +278,9 @@ void RapCorr::fillR3dRapidityHistogram() {
 
 
 float RapCorr::getC2Baseline(TH1D *hmult){
-	if(!hmult) { exit(0); }
+	if(!hmult) { cout << "RapCorr::getC2Baseline - no hmult - exiting" << endl; exit(0); }
 	float nent = (float)hmult->GetEntries();
-	if(!nent) {exit(0); }
+	if(!nent) { cout << "RapCorr::getC2Baseline - no entries - exiting" << endl; exit(0); }
 	TH1D *hMultWork	= (TH1D*)hmult->Clone("hMultWork");
 	hMultWork->Scale(1. / nent);
 	int nBinsX = hMultWork->GetNbinsX();
@@ -369,21 +356,11 @@ void RapCorr::applyC3BaselineAdjustment(float baseC3) {
 	}
 }
 
-
-void RapCorr::fillR2dRapidityBaseHistogram() { 
-	for(int ibin = 1; ibin <= hR2_dRapidity->GetNbinsX(); ibin++) {
-		float val = hR2_dRapidity->GetBinContent(ibin);
-		float valErr = hR2_dRapidity->GetBinError(ibin);	// INCORRECT ERRORS VALS
-		hR2_dRapidityBaseline->SetBinContent(ibin, val);	// straight copy now...
-		hR2_dRapidityBaseline->SetBinError(ibin, valErr);	// INCORRECT ERRORS VALS.
-	}
-}
-
 double RapCorr::calculateIntegral(float baseline) {
 	double integral = 0;
-	int numBins = hR2_dRapidityBaseline->GetNbinsX();
+	int numBins = hR2_dRapidity->GetNbinsX();
 	for(int i = 1; i < numBins; i++) {
-		double value = hR2_dRapidityBaseline->GetBinContent(i);
+		double value = hR2_dRapidity->GetBinContent(i);
 		integral += (value - baseline);
 	}
 	return integral;
@@ -422,7 +399,7 @@ void RapCorr::setStyle() {
 	gStyle->SetHatchesLineWidth(2);
 }
 
-void RapCorr::drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile0, double integral) {
+void RapCorr::drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFilePDF, double integral) {
 		TLatex * text = new TLatex();
 		text->SetTextSize(0.05);
 		text->SetNDC();
@@ -444,20 +421,20 @@ void RapCorr::drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString p
 				hR2->SetStats(0);
 				hR2->Draw("colz");
 			canvases[iCanvas]->cd(5);
-				hR2_dRapidityBaseline->SetStats(0);
-				hR2_dRapidityBaseline->SetMinimum(-0.005);
-				hR2_dRapidityBaseline->SetMaximum(0.005);
-				hR2_dRapidityBaseline->SetMarkerStyle(20);
-				hR2_dRapidityBaseline->SetMarkerSize(1);
-				hR2_dRapidityBaseline->SetMarkerColor(4);
-				hR2_dRapidityBaseline->SetLineColor(4);
-				hR2_dRapidityBaseline->Draw("hist");
+				hR2_dRapidity->SetStats(0);
+				hR2_dRapidity->SetMinimum(-0.005);
+				hR2_dRapidity->SetMaximum(0.005);
+				hR2_dRapidity->SetMarkerStyle(20);
+				hR2_dRapidity->SetMarkerSize(1);
+				hR2_dRapidity->SetMarkerColor(4);
+				hR2_dRapidity->SetLineColor(4);
+				hR2_dRapidity->Draw("hist");
 				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral));
 			canvases[iCanvas]->cd(6);
-				hR2_dRapidityBaseline->Draw();
+				hR2_dRapidity->Draw();
 		canvases[iCanvas]->cd(); 
 		canvases[iCanvas]->Update();
-		canvases[iCanvas]->Print(plotFile0.Data());
+		canvases[iCanvas]->Print(plotFilePDF.Data());
 }
 
 void RapCorr::drawR3HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile) {
@@ -471,7 +448,7 @@ void RapCorr::drawR3HistogramsToFile(TCanvas **canvases, int &iCanvas, TString p
 		canvases[iCanvas]->cd(); 
 		canvases[iCanvas]->Divide(3, 2, 0.0001, 0.0001);
 			canvases[iCanvas]->cd(1);
-				hR2_dRapidityBaseline->Draw("HIST");
+				hR2_dRapidity->Draw("HIST");
 			canvases[iCanvas]->cd(2);
 				hR3_dRapidity->Draw("COLZ1");
 			canvases[iCanvas]->cd(3);
