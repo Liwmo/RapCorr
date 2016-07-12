@@ -2,9 +2,9 @@
 
 RapCorr::RapCorr() {
 	nEvents	= 0;
-	numBins = 36;
-	yLower = -0.72;
-	yUpper = 0.72;
+	numBins = 40;
+	yLower = -1.00;
+	yUpper = 1.00;
 	binWidth = (yUpper - yLower) / numBins;
 	
 	numBinsDY = 2 * numBins - 1;
@@ -12,7 +12,25 @@ RapCorr::RapCorr() {
 	yUpperDY = yUpper - yLower - binWidth / 2.;
 
 	maxMult	= 200;
-	hMultiplicity = new TH1D("hmult", "hmult", maxMult, -0.5, ((float)maxMult)-0.5);
+	hMultiplicity = new TH1D("hmult", "Multiplicity", maxMult, -0.5, ((float)maxMult)-0.5);
+	
+	runR2 = false;
+	runR3 = false; 
+}
+
+RapCorr::RapCorr(int nb, float low, float high) {
+	nEvents	= 0;
+	numBins = nb;
+	yLower = low;
+	yUpper = high;
+	binWidth = (yUpper - yLower) / numBins;
+	
+	numBinsDY = 2 * numBins - 1;
+	yLowerDY = yLower - yUpper + binWidth / 2.;
+	yUpperDY = yUpper - yLower - binWidth / 2.;
+
+	maxMult	= 200;
+	hMultiplicity = new TH1D("hmult", "Multiplicity", maxMult, -0.5, ((float)maxMult)-0.5);
 	
 	runR2 = false;
 	runR3 = false; 
@@ -74,7 +92,7 @@ void RapCorr::calculate() {
 	int iCanvas = -1;
 	TCanvas *canvases[100];
 	TString plotFile0, plotFile, plotFileC, plotFilePDF;
-	setupOutputFilePaths(plotFile0, plotFile, plotFileC, plotFilePDF);
+	//setupOutputFilePaths(plotFile0, plotFile, plotFileC, plotFilePDF);
 
 	TH1 * histosNormalize[5] = {hRapidity1D, hRapidity2D, hRapidity3D, hR2, hR3};
 	normalizeHistograms(histosNormalize, nEvents, 5);
@@ -86,8 +104,8 @@ void RapCorr::calculate() {
 		float baseC2 = getC2Baseline(hMultiplicity);
 		applyC2BaselineAdjustment(baseC2);
 		fillR2dRapidityHistogram();
-		double integral = calculateIntegral(baseC2);
-		drawR2HistogramsToFile(canvases, iCanvas, plotFilePDF, integral);
+		integral = calculateIntegral(baseC2);
+		//drawR2HistogramsToFile(canvases, iCanvas, plotFilePDF, integral);
 	}
 
 	if(runR3) {
@@ -98,7 +116,7 @@ void RapCorr::calculate() {
 		float baseC3 = getC3Baseline(hMultiplicity);
 		applyC3BaselineAdjustment(baseC3);
 		fillR3dRapidityHistogram();
-		drawR3HistogramsToFile(canvases, iCanvas, plotFile);
+		//drawR3HistogramsToFile(canvases, iCanvas, plotFile);
 	}
 }
 
@@ -358,7 +376,7 @@ double RapCorr::calculateIntegral(float baseline) {
 	int numBins = hR2_dRapidity->GetNbinsX();
 	for(int i = 1; i < numBins; i++) {
 		double value = hR2_dRapidity->GetBinContent(i);
-		integral += (value - baseline);
+		integral += value;
 	}
 	return integral;
 }

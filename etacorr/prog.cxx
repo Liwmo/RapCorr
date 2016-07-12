@@ -2,9 +2,12 @@
 
 void plotRapidityCorrelations();
 int addUrQMDEventsFromPath(TChain*);
-double * fillRapidities(TrackInfo&, int, int&); 
+double * fillRapidities(TrackInfo&, int, int&, double); 
 void getInfo(int, float, float, float, TString&, float&, float&, float&,
 		    	float&, float&, float&, float&, float&, float&);
+void setupOutputFilePaths(TString&, TString&, TString&, TString&);
+void drawR2HistogramsToFile(TCanvas**, int&, TString, TH1D**, double*);
+
 
 int main(int argc, char **argv) {
 	gRandom->SetSeed(123456);
@@ -51,14 +54,22 @@ void plotRapidityCorrelations() {
 	chain->SetBranchAddress("gpy", gpy, &b_gpy);
 	chain->SetBranchAddress("gpz", gpz, &b_gpz);
 
-	RapCorr *rapCorr = new RapCorr();
-	rapCorr->setRunR2(true);
-	rapCorr->setRunR3(false);
-	rapCorr->book();
+	int bins = 28;
+	float window = 0.72;
+	RapCorr ** rapCorr = new RapCorr*[5];
+	for(int i = 0; i < 5; i++) {
+		rapCorr[i] = new RapCorr(bins, -window, window);
+		rapCorr[i]->setRunR2(true);
+		rapCorr[i]->setRunR3(false);
+		rapCorr[i]->book();
+		bins += 14;
+		window += 0.36;
+	}
 	
 	const int N_EVENTS = 100000;
 	TrackInfo trackInfo = {igid, gpx, gpy, gpz, name, mass, charge, 
 	lifetime, eta, rapidity, phi, pTotal, pt, baryonNo};
+
 
 	for(Long64_t iEvent = 0; iEvent < N_EVENTS; iEvent++) {
 
@@ -68,27 +79,60 @@ void plotRapidityCorrelations() {
                
 		nb = chain->GetEntry(iEvent);
 		int N_TRACKS = mpart;
+		int MAX_MULT = 200;
 	    int N_PROTON_TRACKS = 0;
-	    double *rapidityArr = new double[N_TRACKS];
-	    memset(rapidityArr, 0, N_TRACKS*sizeof(double)); 
+
+	    double ** rapidityArr = new double*[5];
+	    for(int i = 0; i < 5; i++) {
+	    	rapidityArr[i] = new double[MAX_MULT];
+	   		memset(rapidityArr[i], 0, MAX_MULT * sizeof(double)); 
+	    }
+
 
 		if(parimp > 3.2) {
 			delete[] rapidityArr; rapidityArr = 0;
 			continue; // allow only 0-5% central collisions...  
 		} 
 
-		rapidityArr = fillRapidities(trackInfo, N_TRACKS, N_PROTON_TRACKS);
-		rapCorr->increment(rapidityArr, N_PROTON_TRACKS);
+		window = 0.72;
+		for(int i = 0; i < 5; i++) {
+			rapidityArr[i] = fillRapidities(trackInfo, N_TRACKS, N_PROTON_TRACKS, window);
+			window += 0.36;
+			rapCorr[i]->increment(rapidityArr[i], N_PROTON_TRACKS);
+		}
+
+		for(int i = 0; i < 5; i++) {
+			delete rapidityArr[i]; rapidityArr[i] = 0;
+		}
 		delete[] rapidityArr; rapidityArr = 0;	
 	}
-	rapCorr->calculate();
-	rapCorr->plot();
-	delete rapCorr; rapCorr = 0;
+
+	double *integral = new double[5];
+	for(int i = 0; i < 5; i++) {
+		rapCorr[i]->calculate();
+		integral[i] = rapCorr[i]->getIntegral();
+	}
+
+	TH1D ** histograms = new TH1D*[5];
+	for(int i = 0; i < 5; i++) {
+	    histograms[i] = rapCorr[i]->getR2dRapidity();
+	}
+
+	int iCanvas = -1;
+	TCanvas *canvases[100];
+	TString plotFile0, plotFile, plotFileC, plotFilePDF;
+	setupOutputFilePaths(plotFile0, plotFile, plotFileC, plotFilePDF);
+	drawR2HistogramsToFile(canvases, iCanvas, plotFilePDF, histograms, integral);
+
+	for(int i = 0; i < 5; i++) {
+		delete rapCorr[i]; rapCorr[i] = 0;
+	}
+	delete[] rapCorr; rapCorr = 0;
 }
 
 int addUrQMDEventsFromPath(TChain *chain) {
     TString path = TString("/nfs/rhi/UrQMD/events_2016/007/");
-	TString	filenames = TString("urqmd_19_0005_*.root");
+	TString	filenames = TString("urqmd_19_0099_*.root");
 	TString input = path + filenames;
 	cout << input.Data() << endl;
 	chain->Add(input.Data());
@@ -97,7 +141,7 @@ int addUrQMDEventsFromPath(TChain *chain) {
 	return neventtree;
 }
 
-double * fillRapidities(TrackInfo &info, int N_TRACKS, int &N_PROTON_TRACKS) {
+double * fillRapidities(TrackInfo &info, int N_TRACKS, int &N_PROTON_TRACKS, double window) {
 	double *rapidityArr = new double[N_TRACKS];
 	int protonCount = 0; 
 	const int PROTON = 14;
@@ -105,7 +149,7 @@ double * fillRapidities(TrackInfo &info, int N_TRACKS, int &N_PROTON_TRACKS) {
 	for(int iTrack = 0; iTrack < N_TRACKS; iTrack++) {
 		getInfo(info.geantID[iTrack], info.px[iTrack], info.py[iTrack], info.pz[iTrack], 
 			info.name, info.mass, info.charge, info.lifetime, info.eta, info.rapidity, info.phi, info.pTotal, info.pt, info.baryonNo);
-		if(info.geantID[iTrack] == PROTON && abs(info.rapidity) <= 1.0) { 
+		if(info.geantID[iTrack] == PROTON && fabs(info.rapidity) <= window) { 
 			rapidityArr[protonCount] = info.rapidity;
 			protonCount++;
 		}
@@ -173,4 +217,66 @@ void getInfo(int geantID, float px, float py, float pz,
         else {
              eta = 0;
         }
+}
+
+void setupOutputFilePaths(TString &plotFile0, TString &plotFile, 
+	TString &plotFileC, TString &plotFilePDF) {
+
+	TString plotFileBase, rootOutFile;
+
+	rootOutFile	= TString(Form("./root/etacorr.root"));
+	plotFileBase = TString(Form("./ps/etacorr"));
+	cout << "root file = " << rootOutFile.Data() << endl;
+	cout << "plot file = " << plotFileBase.Data() << endl;
+	plotFile0 = plotFileBase + TString(".ps(");
+	plotFile = plotFileBase + TString(".ps");
+	plotFileC = plotFileBase + TString(".ps]");
+	plotFilePDF	= plotFileBase + TString(".pdf");
+}
+
+void drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFilePDF, TH1D** histograms, double *integral) {
+		TLatex * text = new TLatex();
+		text->SetTextSize(0.05);
+		text->SetNDC();
+		char buf[200];
+		iCanvas++;
+		sprintf(buf, "canvases%d", iCanvas);
+		canvases[iCanvas] = new TCanvas(buf, buf, 30 * iCanvas, 30 * iCanvas, 800, (8.5 / 11.) * 800);
+		canvases[iCanvas]->cd(); 
+		canvases[iCanvas]->Divide(3,2,0.0001,0.0001);
+			canvases[iCanvas]->cd(1);
+				histograms[0]->SetStats(0);
+				histograms[0]->SetMinimum(-0.01);
+				histograms[0]->SetMaximum(0.01);
+				histograms[0]->Draw("hist");
+				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[0]));
+			canvases[iCanvas]->cd(2);
+				histograms[1]->SetStats(0);
+				histograms[1]->SetMinimum(-0.01);
+				histograms[1]->SetMaximum(0.01);
+				histograms[1]->Draw("hist");
+				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[1]));
+			canvases[iCanvas]->cd(3);
+				histograms[2]->SetStats(0);
+				histograms[2]->SetMinimum(-0.01);
+				histograms[2]->SetMaximum(0.01);
+				histograms[2]->Draw("hist");
+				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[2]));
+			canvases[iCanvas]->cd(4);
+				histograms[3]->SetStats(0);
+				histograms[3]->SetMinimum(-0.01);
+				histograms[3]->SetMaximum(0.01);
+				histograms[3]->Draw("hist");
+				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[3]));
+			canvases[iCanvas]->cd(5);
+				histograms[4]->SetStats(0);
+				histograms[4]->SetMinimum(-0.01);
+				histograms[4]->SetMaximum(0.01);
+				histograms[4]->Draw("hist");
+				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[4]));
+			//canvases[iCanvas]->cd(6);
+				//hR2_dRapidity->Draw();
+		canvases[iCanvas]->cd(); 
+		canvases[iCanvas]->Update();
+		canvases[iCanvas]->Print(plotFilePDF.Data());
 }

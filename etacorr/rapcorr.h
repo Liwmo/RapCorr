@@ -50,7 +50,8 @@ struct TrackInfo {
 
 class RapCorr{
 	public:
-		RapCorr();				
+		RapCorr();		
+		RapCorr(int, float, float);		
 		virtual ~RapCorr();	
 		virtual void book();	
 		virtual void setupOutputFilePaths(TString&, TString&, TString&, TString&);
@@ -76,6 +77,7 @@ class RapCorr{
 		virtual TH3D* getR3();
 		virtual TH2D* getR3dRapidity();
 		virtual TH2D* getR3dRapidityN();
+		virtual double getIntegral();
 
 	private:
 		int	maxMult;
@@ -89,6 +91,7 @@ class RapCorr{
 		bool runR2;
 		bool runR3;
 		int nEvents;
+		double integral;
 
 		TH1D *hMultiplicity;
 		TH1D *hRapidity1D;
@@ -124,7 +127,6 @@ class RapCorr{
 		virtual void applyC3BaselineAdjustment(float);
 		virtual void fillR2dRapidityHistogram();
 		virtual void fillR3dRapidityHistogram();
-		virtual void fillR2dRapidityBaseHistogram();
 		virtual double calculateIntegral(float);
 		virtual void setStyle();
 		virtual void drawR2HistogramsToFile(TCanvas**, int&, TString, double);
@@ -151,5 +153,7 @@ inline TH3D* RapCorr::getTensorProduct3D(){ return hTensorProduct3D; }
 inline TH3D* RapCorr::getR3(){ return hR3; }
 inline TH2D* RapCorr::getR3dRapidity(){ return hR3_dRapidity; }
 inline TH2D* RapCorr::getR3dRapidityN(){ return hR3_dRapidity_N; }
+inline double RapCorr::getIntegral(){ return integral; }
+
 
 #endif
