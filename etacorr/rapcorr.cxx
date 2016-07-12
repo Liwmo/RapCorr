@@ -56,6 +56,7 @@ RapCorr::~RapCorr() {
 }
 
 void RapCorr::book() {
+	TH1::AddDirectory(kFALSE);
 	hRapidity1D = new TH1D("hRapidity1D", "Rapidity 1D", numBins, yLower, yUpper);
 	hRapidity2D = new TH2D("hRapidity2D", "y_{2} vs y_{1}", numBins, yLower, yUpper, numBins, yLower, yUpper);
 	hTensorProduct2D = new TH2D("hTensorProduct2D", "Tensor Product 2D", numBins, yLower, yUpper, numBins, yLower, yUpper);
@@ -423,7 +424,7 @@ void RapCorr::drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString p
 		sprintf(buf, "canvases%d", iCanvas);
 		canvases[iCanvas] = new TCanvas(buf, buf, 30 * iCanvas, 30 * iCanvas, 800, (8.5 / 11.) * 800);
 		canvases[iCanvas]->cd(); 
-		canvases[iCanvas]->Divide(3,2,0.0001,0.0001);
+		canvases[iCanvas]->Divide(3, 2, 0.0001, 0.0001);
 			canvases[iCanvas]->cd(1);
 				hMultiplicity->Draw();
 			canvases[iCanvas]->cd(2);

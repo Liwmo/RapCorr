@@ -6,7 +6,7 @@ double * fillRapidities(TrackInfo&, int, int&, double);
 void getInfo(int, float, float, float, TString&, float&, float&, float&,
 		    	float&, float&, float&, float&, float&, float&);
 void setupOutputFilePaths(TString&, TString&, TString&, TString&);
-void drawR2HistogramsToFile(TCanvas**, int&, TString, TH1D**, double*);
+void drawR2WindowWidthsToFile(TCanvas**, int&, TString, TH1D**, double*);
 
 
 int main(int argc, char **argv) {
@@ -122,7 +122,7 @@ void plotRapidityCorrelations() {
 	TCanvas *canvases[100];
 	TString plotFile0, plotFile, plotFileC, plotFilePDF;
 	setupOutputFilePaths(plotFile0, plotFile, plotFileC, plotFilePDF);
-	drawR2HistogramsToFile(canvases, iCanvas, plotFilePDF, histograms, integral);
+	drawR2WindowWidthsToFile(canvases, iCanvas, plotFilePDF, histograms, integral);
 
 	for(int i = 0; i < 5; i++) {
 		delete rapCorr[i]; rapCorr[i] = 0;
@@ -234,7 +234,7 @@ void setupOutputFilePaths(TString &plotFile0, TString &plotFile,
 	plotFilePDF	= plotFileBase + TString(".pdf");
 }
 
-void drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFilePDF, TH1D** histograms, double *integral) {
+void drawR2WindowWidthsToFile(TCanvas **canvases, int &iCanvas, TString plotFilePDF, TH1D** histograms, double *integral) {
 		TLatex * text = new TLatex();
 		text->SetTextSize(0.05);
 		text->SetNDC();
@@ -248,34 +248,48 @@ void drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFilePD
 				histograms[0]->SetStats(0);
 				histograms[0]->SetMinimum(-0.01);
 				histograms[0]->SetMaximum(0.01);
+				histograms[0]->SetLineColor(kBlue);
 				histograms[0]->Draw("hist");
 				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[0]));
 			canvases[iCanvas]->cd(2);
 				histograms[1]->SetStats(0);
 				histograms[1]->SetMinimum(-0.01);
 				histograms[1]->SetMaximum(0.01);
+				histograms[1]->SetLineColor(kRed);
 				histograms[1]->Draw("hist");
 				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[1]));
 			canvases[iCanvas]->cd(3);
 				histograms[2]->SetStats(0);
 				histograms[2]->SetMinimum(-0.01);
 				histograms[2]->SetMaximum(0.01);
+				histograms[2]->SetLineColor(kGreen);
 				histograms[2]->Draw("hist");
 				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[2]));
 			canvases[iCanvas]->cd(4);
 				histograms[3]->SetStats(0);
 				histograms[3]->SetMinimum(-0.01);
 				histograms[3]->SetMaximum(0.01);
+				histograms[3]->SetLineColor(kOrange);
 				histograms[3]->Draw("hist");
 				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[3]));
 			canvases[iCanvas]->cd(5);
 				histograms[4]->SetStats(0);
 				histograms[4]->SetMinimum(-0.01);
 				histograms[4]->SetMaximum(0.01);
+				histograms[4]->SetLineColor(kGray);
 				histograms[4]->Draw("hist");
 				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[4]));
-			//canvases[iCanvas]->cd(6);
-				//hR2_dRapidity->Draw();
+			canvases[iCanvas]->cd(6);
+				histograms[0]->SetLineColor(kBlue);
+				histograms[0]->Draw("hist");
+				histograms[1]->SetLineColor(kRed);
+				histograms[1]->Draw("same");
+				histograms[2]->SetLineColor(kGreen);
+				histograms[2]->Draw("same");
+				histograms[3]->SetLineColor(kOrange);
+				histograms[3]->Draw("same");
+				histograms[4]->SetLineColor(kGray);
+				histograms[4]->Draw("same");
 		canvases[iCanvas]->cd(); 
 		canvases[iCanvas]->Update();
 		canvases[iCanvas]->Print(plotFilePDF.Data());
