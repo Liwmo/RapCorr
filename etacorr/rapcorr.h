@@ -50,11 +50,9 @@ struct TrackInfo {
 
 class RapCorr{
 	public:
-		RapCorr();		
-		RapCorr(int, float, float);		
+		RapCorr(int nb = 40, float yLower = -1.00, float yUpper = 1.00);		
 		virtual ~RapCorr();	
 		virtual void book();	
-		virtual void setupOutputFilePaths(TString&, TString&, TString&, TString&);
 		virtual void calculate();
 		virtual void increment(double*, int);
 	
@@ -101,6 +99,7 @@ class RapCorr{
 		TH2D *hConstant2D;
 		TH1D *hR2_dRapidity;
 		TH1D *hR2_dRapidity_N;
+		TH1D *hR2_dRapidity_Error;
 
 		TH3D *hRapidity3D;
 		TH3D *hR3;
@@ -128,10 +127,6 @@ class RapCorr{
 		virtual void fillR2dRapidityHistogram();
 		virtual void fillR3dRapidityHistogram();
 		virtual double calculateIntegral(float);
-		virtual void setStyle();
-		virtual void drawR2HistogramsToFile(TCanvas**, int&, TString, double);
-		virtual void drawR3HistogramsToFile(TCanvas**, int&, TString);
-		virtual void executeFilePlots(TCanvas**, int, TString, TString, TString);
 };
 
 inline void RapCorr::setRunR2(bool b){ runR2=b; }
@@ -154,6 +149,5 @@ inline TH3D* RapCorr::getR3(){ return hR3; }
 inline TH2D* RapCorr::getR3dRapidity(){ return hR3_dRapidity; }
 inline TH2D* RapCorr::getR3dRapidityN(){ return hR3_dRapidity_N; }
 inline double RapCorr::getIntegral(){ return integral; }
-
 
 #endif

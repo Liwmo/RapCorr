@@ -1,23 +1,5 @@
 #include "rapcorr.h"
 
-RapCorr::RapCorr() {
-	nEvents	= 0;
-	numBins = 40;
-	yLower = -1.00;
-	yUpper = 1.00;
-	binWidth = (yUpper - yLower) / numBins;
-	
-	numBinsDY = 2 * numBins - 1;
-	yLowerDY = yLower - yUpper + binWidth / 2.;
-	yUpperDY = yUpper - yLower - binWidth / 2.;
-
-	maxMult	= 200;
-	hMultiplicity = new TH1D("hmult", "Multiplicity", maxMult, -0.5, ((float)maxMult)-0.5);
-	
-	runR2 = false;
-	runR3 = false; 
-}
-
 RapCorr::RapCorr(int nb, float low, float high) {
 	nEvents	= 0;
 	numBins = nb;
@@ -29,7 +11,7 @@ RapCorr::RapCorr(int nb, float low, float high) {
 	yLowerDY = yLower - yUpper + binWidth / 2.;
 	yUpperDY = yUpper - yLower - binWidth / 2.;
 
-	maxMult	= 200;
+	maxMult	= 210;
 	hMultiplicity = new TH1D("hmult", "Multiplicity", maxMult, -0.5, ((float)maxMult)-0.5);
 	
 	runR2 = false;
@@ -45,6 +27,7 @@ RapCorr::~RapCorr() {
 	delete hConstant2D; hConstant2D = 0;
 	delete hR2_dRapidity; hR2_dRapidity = 0;
 	delete hR2_dRapidity_N; hR2_dRapidity_N = 0;
+	delete hR2_dRapidity_Error; hR2_dRapidity_Error = 0;
 
 	delete hRapidity3D; hRapidity3D = 0;
 	delete hR3; hR3 = 0;
@@ -64,6 +47,7 @@ void RapCorr::book() {
 	hConstant2D = new TH2D("hConstant2D", "hConstant2D", numBins, yLower, yUpper, numBins, yLower, yUpper);
 	hR2_dRapidity = new TH1D("hR2_dRapidity", "#LTR_{2}#GT vs y_{1}-y_{2}", numBinsDY, yLowerDY, yUpperDY);
 	hR2_dRapidity_N = new TH1D("hR2_dRapidity_N", "NBINS vs y_{1}-y_{2}", numBinsDY, yLowerDY, yUpperDY);
+	hR2_dRapidity_Error = new TH1D("hR2_dRapidity_Error", "#LTR_{2}#GT Error", numBinsDY, yLowerDY, yUpperDY);
 
 	hRapidity3D = new TH3D("hRapidity3D", "Rapidity 3D", numBins, yLower, yUpper, numBins, yLower, yUpper, numBins, yLower, yUpper);
 	hR3 = new TH3D("hR3", "hR3", numBins, yLower, yUpper, numBins, yLower, yUpper, numBins, yLower, yUpper);
@@ -93,7 +77,6 @@ void RapCorr::calculate() {
 	int iCanvas = -1;
 	TCanvas *canvases[100];
 	TString plotFile0, plotFile, plotFileC, plotFilePDF;
-	//setupOutputFilePaths(plotFile0, plotFile, plotFileC, plotFilePDF);
 
 	TH1 * histosNormalize[5] = {hRapidity1D, hRapidity2D, hRapidity3D, hR2, hR3};
 	normalizeHistograms(histosNormalize, nEvents, 5);
@@ -106,7 +89,6 @@ void RapCorr::calculate() {
 		applyC2BaselineAdjustment(baseC2);
 		fillR2dRapidityHistogram();
 		integral = calculateIntegral(baseC2);
-		//drawR2HistogramsToFile(canvases, iCanvas, plotFilePDF, integral);
 	}
 
 	if(runR3) {
@@ -117,23 +99,7 @@ void RapCorr::calculate() {
 		float baseC3 = getC3Baseline(hMultiplicity);
 		applyC3BaselineAdjustment(baseC3);
 		fillR3dRapidityHistogram();
-		//drawR3HistogramsToFile(canvases, iCanvas, plotFile);
 	}
-}
-
-void RapCorr::setupOutputFilePaths(TString &plotFile0, TString &plotFile, 
-	TString &plotFileC, TString &plotFilePDF) {
-
-	TString plotFileBase, rootOutFile;
-
-	rootOutFile	= TString(Form("./root/etacorr.root"));
-	plotFileBase = TString(Form("./ps/etacorr"));
-	cout << "root file = " << rootOutFile.Data() << endl;
-	cout << "plot file = " << plotFileBase.Data() << endl;
-	plotFile0 = plotFileBase + TString(".ps(");
-	plotFile = plotFileBase + TString(".ps");
-	plotFileC = plotFileBase + TString(".ps]");
-	plotFilePDF	= plotFileBase + TString(".pdf");
 }
 
 void RapCorr::fill1DRapidityDist(double *rapidities, int nTracks) {
@@ -169,6 +135,7 @@ void RapCorr::fill3DRapidityDist(double *rapidities, int nTracks) {
 
 void RapCorr::normalizeHistograms(TH1 **histos, int normConst, int size) {
 	for(int i = 0; i < size; i++) {
+		histos[i]->Sumw2();
 		histos[i]->Scale(1. / normConst);
 	}
 }
@@ -265,14 +232,17 @@ void RapCorr::calculateR3Histogram() {
 void RapCorr::fillR2dRapidityHistogram() {
 	for(int ibx = 1; ibx <= numBins; ibx++) {								
 		for(int iby = 1; iby <= numBins; iby++) {						
-			float dEtaXY;									
+			float dEtaXY;
+			double val = hR2->GetBinContent(ibx, iby);
 			dEtaXY = hR2->GetXaxis()->GetBinCenter(ibx) 		
 			       - hR2->GetYaxis()->GetBinCenter(iby);
-			hR2_dRapidity->Fill(dEtaXY, hR2->GetBinContent(ibx, iby));
+			hR2_dRapidity->Fill(dEtaXY, val);
+			hR2_dRapidity_Error->Fill(dEtaXY, val * val);
 			hR2_dRapidity_N->Fill(dEtaXY, 1.0);
 		}	
 	} 
 	hR2_dRapidity->Divide(hR2_dRapidity_N);
+	hR2_dRapidity_Error->Divide(hR2_dRapidity_N);
 }
 
 void RapCorr::fillR3dRapidityHistogram() {
@@ -380,109 +350,4 @@ double RapCorr::calculateIntegral(float baseline) {
 		integral += value;
 	}
 	return integral;
-}
-
-
-void RapCorr::setStyle() {
-	gStyle->SetPaperSize(TStyle::kUSLetter);
-	gStyle->SetLabelSize(0.05,"X");
-	gStyle->SetLabelSize(0.05,"Y");
-	gStyle->SetTitleXSize(0.055);
-	gStyle->SetTitleYSize(0.055);
-	gStyle->SetTitleOffset(0.85,"X");
-	gStyle->SetTitleOffset(1.2,"Y");
-	gStyle->SetOptStat(111110);
-	gStyle->SetStatStyle(0); 
-	gStyle->SetTitleStyle(0); 
-	gStyle->SetStatX(0.94);
-	gStyle->SetStatY(0.92);
-	gStyle->SetStatH(0.26);
-	gStyle->SetStatW(0.4);
-	gStyle->SetErrorX(0.0001);
-	gStyle->SetPadRightMargin(0.06);
-	gStyle->SetPadTopMargin(0.08);
-	gStyle->SetPadBottomMargin(0.05);
-	gStyle->SetPadLeftMargin(0.08);
-	gStyle->SetTitleX(0.5);
-	gStyle->SetTitleY(1.0);
-	gStyle->SetTitleW(0.75);
-	gStyle->SetTitleH(0.075);
-	gStyle->SetTitleTextColor(1);
-	gStyle->SetTitleSize(0.1,"T");
-	gStyle->SetPalette(1);
-	gStyle->SetHistMinimumZero(kFALSE);
-	gStyle->SetHatchesSpacing(2);
-	gStyle->SetHatchesLineWidth(2);
-}
-
-void RapCorr::drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFilePDF, double integral) {
-		TLatex * text = new TLatex();
-		text->SetTextSize(0.05);
-		text->SetNDC();
-		char buf[200];
-		iCanvas++;
-		sprintf(buf, "canvases%d", iCanvas);
-		canvases[iCanvas] = new TCanvas(buf, buf, 30 * iCanvas, 30 * iCanvas, 800, (8.5 / 11.) * 800);
-		canvases[iCanvas]->cd(); 
-		canvases[iCanvas]->Divide(3, 2, 0.0001, 0.0001);
-			canvases[iCanvas]->cd(1);
-				hMultiplicity->Draw();
-			canvases[iCanvas]->cd(2);
-				hRapidity1D->SetMinimum(0.5);
-				hRapidity1D->Draw();
-			canvases[iCanvas]->cd(3);
-				hRapidity2D->SetStats(0);
-				hRapidity2D->Draw("colz");
-			canvases[iCanvas]->cd(4);
-				hR2->SetStats(0);
-				hR2->Draw("colz");
-			canvases[iCanvas]->cd(5);
-				hR2_dRapidity->SetStats(0);
-				hR2_dRapidity->SetMinimum(-0.005);
-				hR2_dRapidity->SetMaximum(0.005);
-				hR2_dRapidity->SetMarkerStyle(20);
-				hR2_dRapidity->SetMarkerSize(1);
-				hR2_dRapidity->SetMarkerColor(4);
-				hR2_dRapidity->SetLineColor(4);
-				hR2_dRapidity->Draw("hist");
-				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral));
-			canvases[iCanvas]->cd(6);
-				hR2_dRapidity->Draw();
-		canvases[iCanvas]->cd(); 
-		canvases[iCanvas]->Update();
-		canvases[iCanvas]->Print(plotFilePDF.Data());
-}
-
-void RapCorr::drawR3HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile) {
-		char buf[200];
-		iCanvas++;	
-		gStyle->SetOptStat(0);
-		gStyle->SetPadRightMargin(0.15);
-		iCanvas++;
-		sprintf(buf, "canvases%d", iCanvas);
-		canvases[iCanvas] = new TCanvas(buf, buf, 30 * iCanvas, 30 * iCanvas, 800, (8.5 / 11.) * 800);
-		canvases[iCanvas]->cd(); 
-		canvases[iCanvas]->Divide(3, 2, 0.0001, 0.0001);
-			canvases[iCanvas]->cd(1);
-				hR2_dRapidity->Draw("HIST");
-			canvases[iCanvas]->cd(2);
-				hR3_dRapidity->Draw("COLZ1");
-			canvases[iCanvas]->cd(3);
-				hR3_dRapidity_N->Draw("COLZ1");
-			canvases[iCanvas]->cd(4);
-			canvases[iCanvas]->cd(5);
-			canvases[iCanvas]->cd(6);
-		canvases[iCanvas]->cd(); 
-		canvases[iCanvas]->Update();
-		canvases[iCanvas]->Print(plotFile.Data());
-		gStyle->SetPadRightMargin(0.06);
-}
-
-void RapCorr::executeFilePlots(TCanvas **canvases, int iCanvas, TString plotFileC, 
-	TString plotFile, TString plotFilePDF) {
-		char buf[200];
-	 	canvases[iCanvas]->Print(plotFileC.Data());
-	 	sprintf(buf, "/usr/bin/pstopdf %s -o %s", plotFile.Data(), plotFilePDF.Data());
-	 	cout << " " << buf << endl;
-	 	gSystem->Exec(buf);
 }

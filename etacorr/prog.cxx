@@ -5,9 +5,11 @@ int addUrQMDEventsFromPath(TChain*);
 double * fillRapidities(TrackInfo&, int, int&, double); 
 void getInfo(int, float, float, float, TString&, float&, float&, float&,
 		    	float&, float&, float&, float&, float&, float&);
-void setupOutputFilePaths(TString&, TString&, TString&, TString&);
-void drawR2WindowWidthsToFile(TCanvas**, int&, TString, TH1D**, double*);
-
+void setupOutputFilePaths(TString&, TString&, TString&);
+void setStyle();
+void drawR2HistogramsToFile(TCanvas**, int&, TString, TH1**, double);
+void drawR2WindowWidthsToFile(TCanvas**, int&, TString, TString, TH1D**, double*);
+void executeFilePlots(TCanvas**, int, TString);
 
 int main(int argc, char **argv) {
 	gRandom->SetSeed(123456);
@@ -16,7 +18,6 @@ int main(int argc, char **argv) {
 }
 
 void plotRapidityCorrelations() {
-
 	float mass, charge, lifetime, eta, rapidity, phi, pTotal, pt, baryonNo; 
 	TString name;
 
@@ -54,85 +55,92 @@ void plotRapidityCorrelations() {
 	chain->SetBranchAddress("gpy", gpy, &b_gpy);
 	chain->SetBranchAddress("gpz", gpz, &b_gpz);
 
-	int bins = 28;
-	float window = 0.72;
-	RapCorr ** rapCorr = new RapCorr*[5];
-	for(int i = 0; i < 5; i++) {
-		rapCorr[i] = new RapCorr(bins, -window, window);
-		rapCorr[i]->setRunR2(true);
-		rapCorr[i]->setRunR3(false);
-		rapCorr[i]->book();
-		bins += 14;
-		window += 0.36;
+	const int N_COMPARE = 9;
+	RapCorr ** rapCorrWidths = new RapCorr*[N_COMPARE];	
+	const int bins[N_COMPARE] = {8, 20, 28, 56, 88, 116, 144, 200, 320};
+	const float widths[N_COMPARE] = {0.10, 0.25, 0.35, 0.70, 1.10, 1.45, 1.80, 2.50, 4.00};
+	for(int i = 0; i < N_COMPARE; i++) {
+		rapCorrWidths[i] = new RapCorr(bins[i], -widths[i], widths[i]);
+		rapCorrWidths[i]->setRunR2(true);
+		rapCorrWidths[i]->book();
 	}
-	
-	const int N_EVENTS = 100000;
+	int N_EVENTS = 500000;
+	if(N_EVENTS > nentries) {
+		N_EVENTS = nentries;
+	}
 	TrackInfo trackInfo = {igid, gpx, gpy, gpz, name, mass, charge, 
 	lifetime, eta, rapidity, phi, pTotal, pt, baryonNo};
 
+	const int MAX_MULT = 210;
+	const int PROTON = 14;
+	double ** rapidityWidthsArr = new double*[6];
+    for(int i = 0; i < N_COMPARE; i++) {
+    	rapidityWidthsArr[i] = new double[MAX_MULT];
+   		memset(rapidityWidthsArr[i], 0, MAX_MULT * sizeof(double)); 
+    }
 
 	for(Long64_t iEvent = 0; iEvent < N_EVENTS; iEvent++) {
-
 		if(iEvent % (N_EVENTS / 10) == 0) { 
 			cout << "processing " << iEvent << " of " << N_EVENTS << endl; 
 		}
                
 		nb = chain->GetEntry(iEvent);
 		int N_TRACKS = mpart;
-		int MAX_MULT = 200;
 	    int N_PROTON_TRACKS = 0;
 
-	    double ** rapidityArr = new double*[5];
-	    for(int i = 0; i < 5; i++) {
-	    	rapidityArr[i] = new double[MAX_MULT];
-	   		memset(rapidityArr[i], 0, MAX_MULT * sizeof(double)); 
-	    }
-
-
 		if(parimp > 3.2) {
-			delete[] rapidityArr; rapidityArr = 0;
 			continue; // allow only 0-5% central collisions...  
 		} 
 
-		window = 0.72;
-		for(int i = 0; i < 5; i++) {
-			rapidityArr[i] = fillRapidities(trackInfo, N_TRACKS, N_PROTON_TRACKS, window);
-			window += 0.36;
-			rapCorr[i]->increment(rapidityArr[i], N_PROTON_TRACKS);
+		for(int i = 0; i < N_COMPARE; i++) {
+			int protonCount = 0; 
+
+			for(int iTrack = 0; iTrack < N_TRACKS; iTrack++) {
+				getInfo(trackInfo.geantID[iTrack], trackInfo.px[iTrack], trackInfo.py[iTrack], trackInfo.pz[iTrack], 
+					trackInfo.name, trackInfo.mass, trackInfo.charge, trackInfo.lifetime, trackInfo.eta, trackInfo.rapidity, trackInfo.phi, trackInfo.pTotal, trackInfo.pt, trackInfo.baryonNo);
+				if(trackInfo.geantID[iTrack] == PROTON && fabs(trackInfo.rapidity) <= widths[i]) { 
+					rapidityWidthsArr[i][protonCount] = trackInfo.rapidity;
+					protonCount++;
+				}
+			}
+				N_PROTON_TRACKS = protonCount;
+				rapCorrWidths[i]->increment(rapidityWidthsArr[i], N_PROTON_TRACKS);
 		}
 
-		for(int i = 0; i < 5; i++) {
-			delete rapidityArr[i]; rapidityArr[i] = 0;
-		}
-		delete[] rapidityArr; rapidityArr = 0;	
 	}
 
-	double *integral = new double[5];
-	for(int i = 0; i < 5; i++) {
-		rapCorr[i]->calculate();
-		integral[i] = rapCorr[i]->getIntegral();
+	double * widthIntegrals = new double[N_COMPARE];
+	for(int i = 0; i < N_COMPARE; i++) {
+		rapCorrWidths[i]->calculate();
+		widthIntegrals[i] = rapCorrWidths[i]->getIntegral();
 	}
 
-	TH1D ** histograms = new TH1D*[5];
-	for(int i = 0; i < 5; i++) {
-	    histograms[i] = rapCorr[i]->getR2dRapidity();
+	TH1D ** widthHistograms = new TH1D*[N_COMPARE];
+	for(int i = 0; i < N_COMPARE; i++) {
+	    widthHistograms[i] = rapCorrWidths[i]->getR2dRapidity();
 	}
 
 	int iCanvas = -1;
 	TCanvas *canvases[100];
-	TString plotFile0, plotFile, plotFileC, plotFilePDF;
-	setupOutputFilePaths(plotFile0, plotFile, plotFileC, plotFilePDF);
-	drawR2WindowWidthsToFile(canvases, iCanvas, plotFilePDF, histograms, integral);
-
-	for(int i = 0; i < 5; i++) {
-		delete rapCorr[i]; rapCorr[i] = 0;
+	TString plotFile0, plotFile, plotFileC;
+	setupOutputFilePaths(plotFile0, plotFile, plotFileC);
+	drawR2WindowWidthsToFile(canvases, iCanvas, plotFile0, plotFile, widthHistograms, widthIntegrals);
+	for(int i = 0; i < N_COMPARE; i++) {
+		TH1 **rapidityHistograms = new TH1*[N_COMPARE];
+		rapidityHistograms[0] = (TH1D*) rapCorrWidths[i]->getMultiplicity();
+		rapidityHistograms[1] = (TH1D*) rapCorrWidths[i]->getRapidity1D();
+		rapidityHistograms[2] = (TH2D*) rapCorrWidths[i]->getRapidity2D();
+		rapidityHistograms[3] = (TH2D*) rapCorrWidths[i]->getTensorProduct2D();
+		rapidityHistograms[4] = (TH2D*) rapCorrWidths[i]->getR2(); 
+		rapidityHistograms[5] = (TH1D*) rapCorrWidths[i]->getR2dRapidity();	
+		drawR2HistogramsToFile(canvases, iCanvas, plotFile, rapidityHistograms, widthIntegrals[i]);
 	}
-	delete[] rapCorr; rapCorr = 0;
+	executeFilePlots(canvases, iCanvas, plotFileC);
 }
 
 int addUrQMDEventsFromPath(TChain *chain) {
     TString path = TString("/nfs/rhi/UrQMD/events_2016/007/");
-	TString	filenames = TString("urqmd_19_0099_*.root");
+	TString	filenames = TString("urqmd_19_0005_*.root");
 	TString input = path + filenames;
 	cout << input.Data() << endl;
 	chain->Add(input.Data());
@@ -220,7 +228,7 @@ void getInfo(int geantID, float px, float py, float pz,
 }
 
 void setupOutputFilePaths(TString &plotFile0, TString &plotFile, 
-	TString &plotFileC, TString &plotFilePDF) {
+	TString &plotFileC) {
 
 	TString plotFileBase, rootOutFile;
 
@@ -228,13 +236,83 @@ void setupOutputFilePaths(TString &plotFile0, TString &plotFile,
 	plotFileBase = TString(Form("./ps/etacorr"));
 	cout << "root file = " << rootOutFile.Data() << endl;
 	cout << "plot file = " << plotFileBase.Data() << endl;
-	plotFile0 = plotFileBase + TString(".ps(");
-	plotFile = plotFileBase + TString(".ps");
-	plotFileC = plotFileBase + TString(".ps]");
-	plotFilePDF	= plotFileBase + TString(".pdf");
+	plotFile0 = plotFileBase + TString(".pdf(");
+	plotFile = plotFileBase + TString(".pdf");
+	plotFileC = plotFileBase + TString(".pdf]");
 }
 
-void drawR2WindowWidthsToFile(TCanvas **canvases, int &iCanvas, TString plotFilePDF, TH1D** histograms, double *integral) {
+void setStyle() {
+	gStyle->SetPaperSize(TStyle::kUSLetter);
+	gStyle->SetLabelSize(0.05,"X");
+	gStyle->SetLabelSize(0.05,"Y");
+	gStyle->SetTitleXSize(0.055);
+	gStyle->SetTitleYSize(0.055);
+	gStyle->SetTitleOffset(0.85,"X");
+	gStyle->SetTitleOffset(1.2,"Y");
+	gStyle->SetOptStat(111110);
+	gStyle->SetStatStyle(0); 
+	gStyle->SetTitleStyle(0); 
+	gStyle->SetStatX(0.94);
+	gStyle->SetStatY(0.92);
+	gStyle->SetStatH(0.26);
+	gStyle->SetStatW(0.4);
+	gStyle->SetErrorX(0.0001);
+	gStyle->SetPadRightMargin(0.06);
+	gStyle->SetPadTopMargin(0.08);
+	gStyle->SetPadBottomMargin(0.05);
+	gStyle->SetPadLeftMargin(0.08);
+	gStyle->SetTitleX(0.5);
+	gStyle->SetTitleY(1.0);
+	gStyle->SetTitleW(0.75);
+	gStyle->SetTitleH(0.075);
+	gStyle->SetTitleTextColor(1);
+	gStyle->SetTitleSize(0.1,"T");
+	gStyle->SetPalette(1);
+	gStyle->SetHistMinimumZero(kFALSE);
+	gStyle->SetHatchesSpacing(2);
+	gStyle->SetHatchesLineWidth(2);
+}
+
+void drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile, TH1 **histograms, double integral) {
+		TLatex * text = new TLatex();
+		text->SetTextSize(0.05);
+		text->SetNDC();
+		char buf[200];
+		iCanvas++;
+		sprintf(buf, "canvases%d", iCanvas);
+		canvases[iCanvas] = new TCanvas(buf, buf, 30 * iCanvas, 30 * iCanvas, 800, (8.5 / 11.) * 800);
+		canvases[iCanvas]->cd(); 
+		canvases[iCanvas]->Divide(3, 2, 0.0001, 0.0001);
+			canvases[iCanvas]->cd(1);
+				histograms[0]->Draw();
+			canvases[iCanvas]->cd(2);
+				histograms[1]->SetMinimum(0.5);
+				histograms[1]->Draw();
+			canvases[iCanvas]->cd(3);
+				histograms[2]->SetStats(0);
+				histograms[2]->Draw("colz");
+			canvases[iCanvas]->cd(4);
+				histograms[3]->SetStats(0);
+				histograms[3]->Draw("colz");
+			canvases[iCanvas]->cd(5);
+				histograms[4]->SetStats(0);
+				histograms[4]->Draw("colz");
+			canvases[iCanvas]->cd(6);
+				histograms[5]->SetStats(0);
+				histograms[5]->SetMinimum(-0.005);
+				histograms[5]->SetMaximum(0.005);
+				histograms[5]->SetMarkerStyle(20);
+				histograms[5]->SetMarkerSize(1);
+				histograms[5]->SetMarkerColor(4);
+				histograms[5]->SetLineColor(4);
+				histograms[5]->Draw("hist");
+				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral));
+		canvases[iCanvas]->cd(); 
+		canvases[iCanvas]->Update();
+		canvases[iCanvas]->Print(plotFile.Data());
+}
+
+void drawR2WindowWidthsToFile(TCanvas **canvases, int &iCanvas, TString plotFile0, TString plotFile, TH1D** histograms, double *integral) {
 		TLatex * text = new TLatex();
 		text->SetTextSize(0.05);
 		text->SetNDC();
@@ -280,17 +358,66 @@ void drawR2WindowWidthsToFile(TCanvas **canvases, int &iCanvas, TString plotFile
 				histograms[4]->Draw("hist");
 				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[4]));
 			canvases[iCanvas]->cd(6);
-				histograms[0]->SetLineColor(kBlue);
-				histograms[0]->Draw("hist");
-				histograms[1]->SetLineColor(kRed);
-				histograms[1]->Draw("same");
-				histograms[2]->SetLineColor(kGreen);
-				histograms[2]->Draw("same");
-				histograms[3]->SetLineColor(kOrange);
-				histograms[3]->Draw("same");
-				histograms[4]->SetLineColor(kGray);
-				histograms[4]->Draw("same");
+				histograms[5]->SetStats(0);
+				histograms[5]->SetMinimum(-0.01);
+				histograms[5]->SetMaximum(0.01);
+				histograms[5]->SetLineColor(kViolet);
+				histograms[5]->Draw("hist");
+				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[5]));
 		canvases[iCanvas]->cd(); 
 		canvases[iCanvas]->Update();
-		canvases[iCanvas]->Print(plotFilePDF.Data());
+		canvases[iCanvas]->Print(plotFile0.Data());
+		iCanvas++;
+		canvases[iCanvas] = new TCanvas(buf, buf, 30 * iCanvas, 30 * iCanvas, 800, (8.5 / 11.) * 800);
+		canvases[iCanvas]->cd(); 
+		canvases[iCanvas]->Divide(3,2,0.0001,0.0001);
+			canvases[iCanvas]->cd(1);
+				histograms[6]->SetStats(0);
+				histograms[6]->SetMinimum(-0.01);
+				histograms[6]->SetMaximum(0.01);
+				histograms[6]->SetLineColor(kYellow);
+				histograms[6]->Draw("hist");
+				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[6]));
+			canvases[iCanvas]->cd(2);
+				histograms[7]->SetStats(0);
+				histograms[7]->SetMinimum(-0.01);
+				histograms[7]->SetMaximum(0.01);
+				histograms[7]->SetLineColor(kMagenta);
+				histograms[7]->Draw("hist");
+				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[7]));
+			canvases[iCanvas]->cd(3);
+				histograms[8]->SetStats(0);
+				histograms[8]->SetMinimum(-0.01);
+				histograms[8]->SetMaximum(0.01);
+				histograms[8]->SetLineColor(kBlack);
+				histograms[8]->Draw("hist");
+				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[8]));
+			canvases[iCanvas]->cd(4);
+				histograms[8]->SetLineColor(kBlack);
+				histograms[8]->Draw("hist");
+				histograms[7]->SetLineColor(kMagenta);
+				histograms[7]->Draw("same");
+				histograms[6]->SetLineColor(kYellow);
+				histograms[6]->Draw("same");
+				histograms[5]->SetLineColor(kViolet);
+				histograms[5]->Draw("same");
+				histograms[4]->SetLineColor(kGray);
+				histograms[4]->Draw("same");
+				histograms[3]->SetLineColor(kOrange);
+				histograms[3]->Draw("same");
+				histograms[2]->SetLineColor(kGreen);
+				histograms[2]->Draw("same");
+				histograms[1]->SetLineColor(kRed);
+				histograms[1]->Draw("same");
+				histograms[0]->SetLineColor(kBlue);
+				histograms[0]->Draw("same");
+		canvases[iCanvas]->cd(); 
+		canvases[iCanvas]->Update();
+		canvases[iCanvas]->Print(plotFile.Data());
+}
+
+void executeFilePlots(TCanvas **canvases, int iCanvas, TString plotFileC) {
+		char buf[200];
+	 	canvases[iCanvas]->Print(plotFileC.Data());
+	 	gSystem->Exec(buf);
 }
