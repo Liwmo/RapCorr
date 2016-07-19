@@ -2,13 +2,15 @@
 
 void plotRapidityCorrelations();
 int addUrQMDEventsFromPath(TChain*);
-double * fillRapidities(TrackInfo&, int, int&, double); 
+float Efficiency(int i, float f, int j, float g, float h);
+float GetEffEta(float e);
+float getDetectorEta(float, float);
 void getInfo(int, float, float, float, TString&, float&, float&, float&,
 		    	float&, float&, float&, float&, float&, float&);
 void setupOutputFilePaths(TString&, TString&, TString&);
 void setStyle();
 void drawR2HistogramsToFile(TCanvas**, int&, TString, TH1**, double);
-void drawR2WindowWidthsToFile(TCanvas**, int&, TString, TString, TH1D**, double*);
+void drawR2AcceptancesToFile(TCanvas**, int&, TString, TH1D**, double*);
 void executeFilePlots(TCanvas**, int, TString);
 
 int main(int argc, char **argv) {
@@ -55,28 +57,32 @@ void plotRapidityCorrelations() {
 	chain->SetBranchAddress("gpy", gpy, &b_gpy);
 	chain->SetBranchAddress("gpz", gpz, &b_gpz);
 
-	const int N_COMPARE = 9;
-	RapCorr ** rapCorrWidths = new RapCorr*[N_COMPARE];	
-	const int bins[N_COMPARE] = {8, 20, 28, 56, 88, 116, 144, 200, 320};
-	const float widths[N_COMPARE] = {0.10, 0.25, 0.35, 0.70, 1.10, 1.45, 1.80, 2.50, 4.00};
+	float roots		= 7.7;
+	int   icentbin 	= 15; 		
+	float eff		= 0.0;
+
+	TH2D *hproton_etaeff = new TH2D("hproton_etaeff","hproton_etaeff",100,-2.0,2.0,100,0.0,10.0);
+
+	const int N_COMPARE = 3;
+	RapCorr ** rapCorr = new RapCorr*[N_COMPARE];	
 	for(int i = 0; i < N_COMPARE; i++) {
-		rapCorrWidths[i] = new RapCorr(bins[i], -widths[i], widths[i]);
-		rapCorrWidths[i]->setRunR2(true);
-		rapCorrWidths[i]->book();
+		rapCorr[i] = new RapCorr(40, -1.00, 1.00);
+		rapCorr[i]->setRunR2(true);
+		rapCorr[i]->book();
 	}
-	int N_EVENTS = 500000;
+	int N_EVENTS = 10000;
 	if(N_EVENTS > nentries) {
 		N_EVENTS = nentries;
 	}
 	TrackInfo trackInfo = {igid, gpx, gpy, gpz, name, mass, charge, 
 	lifetime, eta, rapidity, phi, pTotal, pt, baryonNo};
 
-	const int MAX_MULT = 210;
+	const int MAX_MULT = 200;
 	const int PROTON = 14;
-	double ** rapidityWidthsArr = new double*[6];
+	double ** rapidityArr = new double*[N_COMPARE];
     for(int i = 0; i < N_COMPARE; i++) {
-    	rapidityWidthsArr[i] = new double[MAX_MULT];
-   		memset(rapidityWidthsArr[i], 0, MAX_MULT * sizeof(double)); 
+    	rapidityArr[i] = new double[MAX_MULT];
+   		memset(rapidityArr[i], 0, MAX_MULT * sizeof(double)); 
     }
 
 	for(Long64_t iEvent = 0; iEvent < N_EVENTS; iEvent++) {
@@ -86,54 +92,80 @@ void plotRapidityCorrelations() {
                
 		nb = chain->GetEntry(iEvent);
 		int N_TRACKS = mpart;
-	    int N_PROTON_TRACKS = 0;
 
 		if(parimp > 3.2) {
 			continue; // allow only 0-5% central collisions...  
 		} 
 
+
 		for(int i = 0; i < N_COMPARE; i++) {
 			int protonCount = 0; 
-
 			for(int iTrack = 0; iTrack < N_TRACKS; iTrack++) {
 				getInfo(trackInfo.geantID[iTrack], trackInfo.px[iTrack], trackInfo.py[iTrack], trackInfo.pz[iTrack], 
 					trackInfo.name, trackInfo.mass, trackInfo.charge, trackInfo.lifetime, trackInfo.eta, trackInfo.rapidity, trackInfo.phi, trackInfo.pTotal, trackInfo.pt, trackInfo.baryonNo);
-				if(trackInfo.geantID[iTrack] == PROTON && fabs(trackInfo.rapidity) <= widths[i]) { 
-					rapidityWidthsArr[i][protonCount] = trackInfo.rapidity;
-					protonCount++;
+				
+				if(trackInfo.geantID[iTrack] == PROTON && fabs(trackInfo.rapidity) <= 1.00) {
+					
+					if(i == 0) { //acceptance
+						//float zVertex = -30.0 + 60.0 * gRandom->Rndm();
+						//float detectorEta = getDetectorEta(trackInfo.eta, zVertex);
+						//float eff = Efficiency(trackInfo.geantID[iTrack], roots, icentbin, trackInfo.pt, detectorEta);
+						float eff = Efficiency(trackInfo.geantID[iTrack], roots, icentbin, trackInfo.pt, trackInfo.eta);
+						if(gRandom->Rndm() <= eff) {
+							rapidityArr[i][protonCount] = trackInfo.rapidity;
+							protonCount++;
+						}	
+					}
+
+					if(i == 1) { //pt > 0.2
+						if(trackInfo.pt > 0.2) {
+							rapidityArr[i][protonCount] = trackInfo.rapidity;
+							protonCount++;
+						}
+					}
+
+					if(i == 2) { //perfect
+						rapidityArr[i][protonCount] = trackInfo.rapidity;
+						protonCount++;
+					}
+
 				}
 			}
-				N_PROTON_TRACKS = protonCount;
-				rapCorrWidths[i]->increment(rapidityWidthsArr[i], N_PROTON_TRACKS);
+			rapCorr[i]->increment(rapidityArr[i], protonCount);
 		}
-
 	}
 
-	double * widthIntegrals = new double[N_COMPARE];
+	// hproton_etaeff->Draw("LEGO2");	
+	// TFile *f = new TFile("acceptance.root","recreate");
+	// 	f->cd();
+	// 	hproton_etaeff->Write();
+	// f->Close();
+
+	double * integrals = new double[N_COMPARE];
 	for(int i = 0; i < N_COMPARE; i++) {
-		rapCorrWidths[i]->calculate();
-		widthIntegrals[i] = rapCorrWidths[i]->getIntegral();
+		rapCorr[i]->calculate();
+		integrals[i] = rapCorr[i]->getIntegral();
 	}
 
-	TH1D ** widthHistograms = new TH1D*[N_COMPARE];
+	TH1D ** histograms = new TH1D*[N_COMPARE];
 	for(int i = 0; i < N_COMPARE; i++) {
-	    widthHistograms[i] = rapCorrWidths[i]->getR2dRapidity();
+	    histograms[i] = rapCorr[i]->getR2dRapidity();
 	}
 
 	int iCanvas = -1;
 	TCanvas *canvases[100];
 	TString plotFile0, plotFile, plotFileC;
 	setupOutputFilePaths(plotFile0, plotFile, plotFileC);
-	drawR2WindowWidthsToFile(canvases, iCanvas, plotFile0, plotFile, widthHistograms, widthIntegrals);
+	drawR2AcceptancesToFile(canvases, iCanvas, plotFile0, histograms, integrals);
 	for(int i = 0; i < N_COMPARE; i++) {
-		TH1 **rapidityHistograms = new TH1*[N_COMPARE];
-		rapidityHistograms[0] = (TH1D*) rapCorrWidths[i]->getMultiplicity();
-		rapidityHistograms[1] = (TH1D*) rapCorrWidths[i]->getRapidity1D();
-		rapidityHistograms[2] = (TH2D*) rapCorrWidths[i]->getRapidity2D();
-		rapidityHistograms[3] = (TH2D*) rapCorrWidths[i]->getTensorProduct2D();
-		rapidityHistograms[4] = (TH2D*) rapCorrWidths[i]->getR2(); 
-		rapidityHistograms[5] = (TH1D*) rapCorrWidths[i]->getR2dRapidity();	
-		drawR2HistogramsToFile(canvases, iCanvas, plotFile, rapidityHistograms, widthIntegrals[i]);
+		TH1 **rapidityHistograms = new TH1*[6];
+		rapidityHistograms[0] = (TH1D*) rapCorr[i]->getMultiplicity();
+		rapidityHistograms[1] = (TH1D*) rapCorr[i]->getRapidity1D();
+		rapidityHistograms[2] = (TH2D*) rapCorr[i]->getRapidity2D();
+		rapidityHistograms[3] = (TH2D*) rapCorr[i]->getTensorProduct2D();
+		rapidityHistograms[4] = (TH2D*) rapCorr[i]->getR2(); 
+		rapidityHistograms[5] = (TH1D*) rapCorr[i]->getR2dRapidity();	
+		drawR2HistogramsToFile(canvases, iCanvas, plotFile, rapidityHistograms, integrals[i]);
 	}
 	executeFilePlots(canvases, iCanvas, plotFileC);
 }
@@ -149,21 +181,121 @@ int addUrQMDEventsFromPath(TChain *chain) {
 	return neventtree;
 }
 
-double * fillRapidities(TrackInfo &info, int N_TRACKS, int &N_PROTON_TRACKS, double window) {
-	double *rapidityArr = new double[N_TRACKS];
-	int protonCount = 0; 
-	const int PROTON = 14;
-
-	for(int iTrack = 0; iTrack < N_TRACKS; iTrack++) {
-		getInfo(info.geantID[iTrack], info.px[iTrack], info.py[iTrack], info.pz[iTrack], 
-			info.name, info.mass, info.charge, info.lifetime, info.eta, info.rapidity, info.phi, info.pTotal, info.pt, info.baryonNo);
-		if(info.geantID[iTrack] == PROTON && fabs(info.rapidity) <= window) { 
-			rapidityArr[protonCount] = info.rapidity;
-			protonCount++;
+float Efficiency(int igid, float ecm, int icentbin, float ptloc, float etaloc){
+	float	eff_pt,eff_eta,eff;
+	float	rmax 		= 14.6;
+	float	roots[8]	= {7.7,11.5,14.5,19.6,27.0,39.0,62.4,200};
+	float rmeval;
+	float a0,a1,b0,b1,c0,c1,a,b,c;
+	float par_a0_bypart[6]={ 0.8991210, 0.9118330, 0.8933340, 0.8894710, 0.9023340, 0.9033230};
+	float par_a1_bypart[6]={-0.0004252,-0.0004348,-0.0004258,-0.0004039,-0.0004311,-0.0004405};
+	float par_b0_bypart[6]={ 0.2982580, 0.2919930, 0.2805300, 0.2838100, 0.1432090, 0.1447280};
+	float par_b1_bypart[6]={ 0.0000310, 0.0000497, 0.0001448, 0.0001197, 0.0000274, 0.0000352};
+	float par_c0_bypart[6]={ 5.6147900, 6.7754998, 1.2439700, 1.2842700, 4.1700602, 4.5686498};
+	float par_c1_bypart[6]={-0.0074872,-0.0073951, 0.0002585, 0.0000616,-0.0029782,-0.0037452};
+	float avgrm_ds19_[16]={4.45983,6.47677,9.41367,13.4289,18.3822,24.4147,31.8356,40.8872,51.3251,64.2972,78.804,95.7218,116.15,140.037,168.328,206.456};
+	float avgrm_ds20_[16]={5.68122,8.14528,11.6093,16.0707,22.0018,29.4685,38.4022,49.3212,62.2412,77.1492,94.5203,114.854,138.652,166.871,200.417,245.22};
+	float avgrm_ds23_[16]={6.48961,9.43501,13.9132,19.4061,25.9052,34.3486,45.3418,58.3398,73.8073,91.8219,112.777,137.746,166.693,200.552,240.366,294.058};
+	float avgrm_ds25_[16]={6.94922,10.424,15.3716,21.8801,29.8557,39.3737,50.842,65.3122,82.319,102.282,125.774,152.732,183.684,220.041,263.317,319.92};
+	float avgrm_ds18_[16]={8.01674,11.9431,17.4254,23.907,32.3186,43.2726,56.2182,71.6365,90.5218,112.457,137.795,167.654,201.932,241.655,288.174,348.394};
+	float avgrm_ds17_[16]={8.40675,12.8959,18.3962,25.3682,34.8266,46.8351,60.8408,77.8056,97.8285,121.29,149.276,181.273,218.222,261.155,310.917,374.983};
+	float avgrm_ds16_[16]={11.9048,17.3617,24.759,34.6954,47.1183,63.0139,82.4465,105.334,132.719,165.08,201.967,244.275,293.054,347.794,409.85,479.722};
+	float avgrmuse[16];
+	int iroots 		= -1;
+	for (int irs=0;irs<8;irs++){
+		if (std::fabs(roots[irs]-ecm)<0.2) {
+			iroots	= irs;
 		}
 	}
-	N_PROTON_TRACKS = protonCount;
-	return rapidityArr;
+	for (int icb=0;icb<16;icb++){
+		if (iroots==0) {						// 7.7 
+			avgrmuse[icb]	= avgrm_ds19_[icb];
+		} else if (iroots==1) {					// 11.5
+			avgrmuse[icb]	= avgrm_ds20_[icb];
+		} else if (iroots==2||iroots==3) {		// 14.5 & 19.6
+			avgrmuse[icb]	= avgrm_ds23_[icb];
+		} else if (iroots==4) {					// 27.
+			avgrmuse[icb]	= avgrm_ds25_[icb];
+		} else if (iroots==5) {					// 39.
+			avgrmuse[icb]	= avgrm_ds18_[icb];
+		} else if (iroots==6) {					// 62.4
+			avgrmuse[icb]	= avgrm_ds17_[icb];
+		} else if (iroots==7) {					// 200.
+			avgrmuse[icb]	= avgrm_ds16_[icb];
+		}
+	}
+	eff = 0;
+//---- basic cuts
+	if (ptloc<0.2){ return eff; }
+	if (std::fabs(etaloc)>1.3){ return eff; }
+	//
+//---- identify the particle
+	int kp		= -1;
+	if        (igid==8) {		// pi+
+		kp    = 1;
+	} else if (igid==9) {		// pi-
+		kp    = 0;
+	} else if (igid==11) {		// K+
+		kp    = 3;
+	} else if (igid==12) {		// K-
+		kp    = 2;
+	} else if (igid==14) {		// p
+		kp    = 5;
+	} else if (igid==15) {		// pbar
+		kp    = 4;
+	}
+	if (kp<0){ return false; }
+	//
+//---- get the equivalent refmult
+	if (icentbin>=0&&icentbin<16) {
+		rmeval	= avgrmuse[icentbin];
+	} else { 
+		cout<<"confused about centbin.... "<<icentbin<<endl;
+		exit(0);
+	}
+	a0			= par_a0_bypart[kp];
+	a1			= par_a1_bypart[kp];
+	b0			= par_b0_bypart[kp];
+	b1			= par_b1_bypart[kp];
+	c0			= par_c0_bypart[kp];
+	c1			= par_c1_bypart[kp];
+	a			= a0 + a1*rmeval;
+	b			= b0 + b1*rmeval;
+	c			= c0 + c1*rmeval;
+	eff_pt	= a*TMath::Exp( -std::pow(b/ptloc,c) );
+	eff_eta	= GetEffEta(etaloc);
+	eff 	= eff_pt*eff_eta/0.91;
+	if (eff_eta<=0.0) eff_eta = 0;
+	//cout<<ptloc<<" "<<etaloc<<" "<<eff_pt<<" "<<eff_eta<<" "<<eff<<endl;
+	return eff;
+}
+
+float GetEffEta(float etaloc) {
+	const int proton_etaeff_N	= 15;
+	float proton_etaeff_eta[proton_etaeff_N] = {-1.25761,-1.15457,-1.05152,-0.957845,-0.765808,-0.339578,-0.0538642,
+					0.348946,0.653396,0.798595,0.957845,1.05152	,1.15457,1.25761,1.36066};
+	float proton_etaeff_eff[proton_etaeff_N] = {0.0512,0.5152,0.7872,0.8976,0.91,0.91,0.91,0.91,
+					0.91,0.8768,0.8496,0.728,0.5056,0.056,0.016};
+	float effeta = 0.0;
+	if (std::fabs(etaloc)>1.3){ return effeta; }
+	for (int ie=0;ie<proton_etaeff_N-1;ie++){
+		if (etaloc<proton_etaeff_eta[ie+1]){
+			float slope = (proton_etaeff_eff[ie+1]-proton_etaeff_eff[ie])/(proton_etaeff_eta[ie+1]-proton_etaeff_eta[ie]);
+			effeta  = proton_etaeff_eff[ie] + (etaloc-proton_etaeff_eta[ie])*slope;
+			effeta	/= 0.91;
+			break;
+		}
+	}
+	return effeta; 
+}
+
+float getDetectorEta(float particleEta, float zVertex) {
+	float radius = 2;
+	float particleTheta = 2 * TMath::ATan( TMath::Exp(-particleEta) ); 
+	float z = radius / TMath::Tan(particleTheta);
+	float detectorTheta = TMath::ATan( radius / (z - zVertex) );
+	float detectorEta = -TMath::Log( TMath::Tan(detectorTheta / 2) );
+	return detectorEta;
 }
 
 void getInfo(int geantID, float px, float py, float pz, 
@@ -312,7 +444,7 @@ void drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile, 
 		canvases[iCanvas]->Print(plotFile.Data());
 }
 
-void drawR2WindowWidthsToFile(TCanvas **canvases, int &iCanvas, TString plotFile0, TString plotFile, TH1D** histograms, double *integral) {
+void drawR2AcceptancesToFile(TCanvas **canvases, int &iCanvas, TString plotFile0, TH1D** histograms, double *integral) {
 		TLatex * text = new TLatex();
 		text->SetTextSize(0.05);
 		text->SetNDC();
@@ -321,7 +453,7 @@ void drawR2WindowWidthsToFile(TCanvas **canvases, int &iCanvas, TString plotFile
 		sprintf(buf, "canvases%d", iCanvas);
 		canvases[iCanvas] = new TCanvas(buf, buf, 30 * iCanvas, 30 * iCanvas, 800, (8.5 / 11.) * 800);
 		canvases[iCanvas]->cd(); 
-		canvases[iCanvas]->Divide(3,2,0.0001,0.0001);
+		canvases[iCanvas]->Divide(2, 2, 0.0001, 0.0001);
 			canvases[iCanvas]->cd(1);
 				histograms[0]->SetStats(0);
 				histograms[0]->SetMinimum(-0.01);
@@ -344,76 +476,15 @@ void drawR2WindowWidthsToFile(TCanvas **canvases, int &iCanvas, TString plotFile
 				histograms[2]->Draw("hist");
 				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[2]));
 			canvases[iCanvas]->cd(4);
-				histograms[3]->SetStats(0);
-				histograms[3]->SetMinimum(-0.01);
-				histograms[3]->SetMaximum(0.01);
-				histograms[3]->SetLineColor(kOrange);
-				histograms[3]->Draw("hist");
-				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[3]));
-			canvases[iCanvas]->cd(5);
-				histograms[4]->SetStats(0);
-				histograms[4]->SetMinimum(-0.01);
-				histograms[4]->SetMaximum(0.01);
-				histograms[4]->SetLineColor(kGray);
-				histograms[4]->Draw("hist");
-				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[4]));
-			canvases[iCanvas]->cd(6);
-				histograms[5]->SetStats(0);
-				histograms[5]->SetMinimum(-0.01);
-				histograms[5]->SetMaximum(0.01);
-				histograms[5]->SetLineColor(kViolet);
-				histograms[5]->Draw("hist");
-				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[5]));
-		canvases[iCanvas]->cd(); 
-		canvases[iCanvas]->Update();
-		canvases[iCanvas]->Print(plotFile0.Data());
-		iCanvas++;
-		canvases[iCanvas] = new TCanvas(buf, buf, 30 * iCanvas, 30 * iCanvas, 800, (8.5 / 11.) * 800);
-		canvases[iCanvas]->cd(); 
-		canvases[iCanvas]->Divide(3,2,0.0001,0.0001);
-			canvases[iCanvas]->cd(1);
-				histograms[6]->SetStats(0);
-				histograms[6]->SetMinimum(-0.01);
-				histograms[6]->SetMaximum(0.01);
-				histograms[6]->SetLineColor(kYellow);
-				histograms[6]->Draw("hist");
-				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[6]));
-			canvases[iCanvas]->cd(2);
-				histograms[7]->SetStats(0);
-				histograms[7]->SetMinimum(-0.01);
-				histograms[7]->SetMaximum(0.01);
-				histograms[7]->SetLineColor(kMagenta);
-				histograms[7]->Draw("hist");
-				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[7]));
-			canvases[iCanvas]->cd(3);
-				histograms[8]->SetStats(0);
-				histograms[8]->SetMinimum(-0.01);
-				histograms[8]->SetMaximum(0.01);
-				histograms[8]->SetLineColor(kBlack);
-				histograms[8]->Draw("hist");
-				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[8]));
-			canvases[iCanvas]->cd(4);
-				histograms[8]->SetLineColor(kBlack);
-				histograms[8]->Draw("hist");
-				histograms[7]->SetLineColor(kMagenta);
-				histograms[7]->Draw("same");
-				histograms[6]->SetLineColor(kYellow);
-				histograms[6]->Draw("same");
-				histograms[5]->SetLineColor(kViolet);
-				histograms[5]->Draw("same");
-				histograms[4]->SetLineColor(kGray);
-				histograms[4]->Draw("same");
-				histograms[3]->SetLineColor(kOrange);
-				histograms[3]->Draw("same");
 				histograms[2]->SetLineColor(kGreen);
-				histograms[2]->Draw("same");
+				histograms[2]->Draw("hist");
 				histograms[1]->SetLineColor(kRed);
 				histograms[1]->Draw("same");
 				histograms[0]->SetLineColor(kBlue);
 				histograms[0]->Draw("same");
 		canvases[iCanvas]->cd(); 
 		canvases[iCanvas]->Update();
-		canvases[iCanvas]->Print(plotFile.Data());
+		canvases[iCanvas]->Print(plotFile0.Data());
 }
 
 void executeFilePlots(TCanvas **canvases, int iCanvas, TString plotFileC) {

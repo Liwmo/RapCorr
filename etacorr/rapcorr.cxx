@@ -11,7 +11,7 @@ RapCorr::RapCorr(int nb, float low, float high) {
 	yLowerDY = yLower - yUpper + binWidth / 2.;
 	yUpperDY = yUpper - yLower - binWidth / 2.;
 
-	maxMult	= 210;
+	maxMult	= 200;
 	hMultiplicity = new TH1D("hmult", "Multiplicity", maxMult, -0.5, ((float)maxMult)-0.5);
 	
 	runR2 = false;
