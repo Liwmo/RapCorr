@@ -1,4 +1,6 @@
 etacorr/etacorr
+etacorr/rapcorr
+etacorr/yrange
 
 # Compiled Object files
 *.slo

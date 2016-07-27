@@ -70,7 +70,7 @@ void plotRapidityCorrelations() {
 		rapCorr[i]->setRunR2(true);
 		rapCorr[i]->book();
 	}
-	int N_EVENTS = 10000;
+	int N_EVENTS = 10000000;
 	if(N_EVENTS > nentries) {
 		N_EVENTS = nentries;
 	}
@@ -106,11 +106,12 @@ void plotRapidityCorrelations() {
 				
 				if(trackInfo.geantID[iTrack] == PROTON && fabs(trackInfo.rapidity) <= 1.00) {
 					
-					if(i == 0) { //acceptance
-						//float zVertex = -30.0 + 60.0 * gRandom->Rndm();
-						//float detectorEta = getDetectorEta(trackInfo.eta, zVertex);
-						//float eff = Efficiency(trackInfo.geantID[iTrack], roots, icentbin, trackInfo.pt, detectorEta);
-						float eff = Efficiency(trackInfo.geantID[iTrack], roots, icentbin, trackInfo.pt, trackInfo.eta);
+					if(i == 0) { //efficiency
+						float zVertex = -30.0 + 60.0 * gRandom->Rndm();
+						float detectorEta = getDetectorEta(trackInfo.eta, zVertex);
+						//cout << "EtaPart: " << trackInfo.eta << " Vertex: " << zVertex << " EtaDet: " << detectorEta << endl;
+
+						float eff = Efficiency(trackInfo.geantID[iTrack], roots, icentbin, trackInfo.pt, detectorEta);
 						if(gRandom->Rndm() <= eff) {
 							rapidityArr[i][protonCount] = trackInfo.rapidity;
 							protonCount++;
@@ -134,12 +135,6 @@ void plotRapidityCorrelations() {
 			rapCorr[i]->increment(rapidityArr[i], protonCount);
 		}
 	}
-
-	// hproton_etaeff->Draw("LEGO2");	
-	// TFile *f = new TFile("acceptance.root","recreate");
-	// 	f->cd();
-	// 	hproton_etaeff->Write();
-	// f->Close();
 
 	double * integrals = new double[N_COMPARE];
 	for(int i = 0; i < N_COMPARE; i++) {
@@ -172,7 +167,7 @@ void plotRapidityCorrelations() {
 
 int addUrQMDEventsFromPath(TChain *chain) {
     TString path = TString("/nfs/rhi/UrQMD/events_2016/007/");
-	TString	filenames = TString("urqmd_19_0005_*.root");
+	TString	filenames = TString("urqmd_19_*.root");
 	TString input = path + filenames;
 	cout << input.Data() << endl;
 	chain->Add(input.Data());
@@ -290,10 +285,21 @@ float GetEffEta(float etaloc) {
 }
 
 float getDetectorEta(float particleEta, float zVertex) {
-	float radius = 2;
-	float particleTheta = 2 * TMath::ATan( TMath::Exp(-particleEta) ); 
+	float radius = 30;
+	float particleTheta, detectorTheta = 0;
+	particleTheta = 2 * TMath::ATan(TMath::Exp(-particleEta)); 
+	if(particleEta < 0) {
+		float modifiedEta = std::fabs(particleEta);
+		particleTheta = 2 * TMath::ATan(TMath::Exp(-modifiedEta)); 
+		particleTheta = TMath::Pi() - particleTheta;
+	}
 	float z = radius / TMath::Tan(particleTheta);
-	float detectorTheta = TMath::ATan( radius / (z - zVertex) );
+	detectorTheta = TMath::ATan(radius / (z - zVertex));
+	if(radius / (z - zVertex) < 0) {
+		float modifiedDen = std::fabs(z - zVertex);
+		detectorTheta = TMath::ATan(radius / modifiedDen);
+		detectorTheta = TMath::Pi() - detectorTheta;
+	}
 	float detectorEta = -TMath::Log( TMath::Tan(detectorTheta / 2) );
 	return detectorEta;
 }
@@ -446,6 +452,7 @@ void drawR2HistogramsToFile(TCanvas **canvases, int &iCanvas, TString plotFile, 
 
 void drawR2AcceptancesToFile(TCanvas **canvases, int &iCanvas, TString plotFile0, TH1D** histograms, double *integral) {
 		TLatex * text = new TLatex();
+        TLegend * legend = new TLegend(0.1, 0.9, 0.38, 0.7);
 		text->SetTextSize(0.05);
 		text->SetNDC();
 		char buf[200];
@@ -455,6 +462,7 @@ void drawR2AcceptancesToFile(TCanvas **canvases, int &iCanvas, TString plotFile0
 		canvases[iCanvas]->cd(); 
 		canvases[iCanvas]->Divide(2, 2, 0.0001, 0.0001);
 			canvases[iCanvas]->cd(1);
+                legend->AddEntry(histograms[0], "Z_{vtx} Acceptance", "l");
 				histograms[0]->SetStats(0);
 				histograms[0]->SetMinimum(-0.01);
 				histograms[0]->SetMaximum(0.01);
@@ -462,6 +470,7 @@ void drawR2AcceptancesToFile(TCanvas **canvases, int &iCanvas, TString plotFile0
 				histograms[0]->Draw("hist");
 				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[0]));
 			canvases[iCanvas]->cd(2);
+                legend->AddEntry(histograms[1], "P_{t} > 0", "l");
 				histograms[1]->SetStats(0);
 				histograms[1]->SetMinimum(-0.01);
 				histograms[1]->SetMaximum(0.01);
@@ -469,6 +478,7 @@ void drawR2AcceptancesToFile(TCanvas **canvases, int &iCanvas, TString plotFile0
 				histograms[1]->Draw("hist");
 				text->DrawLatex(0.2, 0.8, Form("integral=%5.3f", integral[1]));
 			canvases[iCanvas]->cd(3);
+                legend->AddEntry(histograms[2], "Perfect", "l");
 				histograms[2]->SetStats(0);
 				histograms[2]->SetMinimum(-0.01);
 				histograms[2]->SetMaximum(0.01);
@@ -482,6 +492,7 @@ void drawR2AcceptancesToFile(TCanvas **canvases, int &iCanvas, TString plotFile0
 				histograms[1]->Draw("same");
 				histograms[0]->SetLineColor(kBlue);
 				histograms[0]->Draw("same");
+                legend->Draw();
 		canvases[iCanvas]->cd(); 
 		canvases[iCanvas]->Update();
 		canvases[iCanvas]->Print(plotFile0.Data());

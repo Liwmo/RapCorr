@@ -1,0 +1,10 @@
+CXX = g++
+#INCLUDES := $(root-config --incdir)
+ROOTCFLAGS := $(root-config --cflags)
+ROOTLIBS := $(root-config --libs)
+
+yrange: yrange.o
+	$(CXX) -L/wsu/home/fr/fr45/fr4526/build/root_v5.34.34/lib -lCore -lCint -lRIO -lNet -lHist -lGraf -lGraf3d -lGpad -lTree -lRint -lPostscript -lMatrix -lPhysics -lMathCore -lThread -pthread -lm -ldl -rdynamic yrange.o -o yrange
+
+yrange.o: yrange.cxx
+	$(CXX) -c -pthread -m64 -I/wsu/home/fr/fr45/fr4526/build/root_v5.34.34/include yrange.cxx
