@@ -141,7 +141,7 @@ void plotRapidityCorrelations() {
 
 int addUrQMDEventsFromPath(TChain *chain) {
     TString path = TString("/nfs/rhi/UrQMD/events_2016/007/");
-	TString	filenames = TString("urqmd_19_0005_*.root");
+	TString	filenames = TString("urqmd_19_00*.root");
 	TString input = path + filenames;
 	cout << input.Data() << endl;
 	chain->Add(input.Data());
